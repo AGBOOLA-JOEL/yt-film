@@ -38,6 +38,32 @@ BATCHES, GAPS), `music.py` (CUES), `final.py` (BATCHES ending in `"cta"`, MUSIC)
 Full worked shot lists: `examples/chadwick/tools/shots_b1…b9.py`. Images are 1774 x 887 (2:1);
 all coordinates are **source px** of that image.
 
+## v2: camera eases, depth, focus, face light, tags (`fx3.py`, through `seq.scene`)
+Worked example: `examples/chadwick/tools/shots_b4_v2.py`.
+```python
+python tools/depth.py                     # once per film: build/depth/<image>.png for every scene picture
+S.at(t, scene("S05b_parlour", light=(640, 520),                       # lamp position: form shading on the faces
+              cam=lambda a, z: [(a, 430, 400, 520), (t2, 1050, 380, 600, "io"), (z, 1300, 320, 520, "out")],
+              focus=[(t, (400, 400), 0.8), (t2, (1138, 440), 0.8), (t3, (1493, 320), 0.9)],   # (time, point | depth, amount)
+              label="Cleveland · 1893", corner="bl", haze=(0.2, (128, 134, 158)), snow_z=(0.0, 0.12),
+              draws=[Scrap((1268, 660), (205, 170), t4), Draw("X03_names", 2, (1268, 670), 92, (t4 + .25, t4 + 1.05), (t4 + 1.05, t4 + 1.6))]))
+b.overlay(tag(b, "Dr. Leroy Chadwick", t0, t1), t0, t1 + 0.4)         # a name that stays up across a cut
+S.at(t, page("B02_card", marks=m, cam=lambda a, z: [(a, 850, 300, 500), (z, 905, 400, 625, "out")]))
+```
+- `cam=`: a list of keys or a function `(t0, t1) -> keys`; a key is `(t, cx, cy, h)` plus an optional ease for the
+  segment ending on it: `"io"` (default), `"out"` (fast start, long settle), `"in"`, `"lin"`, `"back"` (small overshoot).
+- `focus=`: a point `(x, y)` in source px, a depth (0 far - 1 near), or keys. Needs the picture's depth map.
+- LIVE's `("snow", a)` / `("rain", a)` become `fx3.Snow` / `fx3.Rain` when a depth map exists (each flake hidden by
+  anything nearer); `snow_z=(lo, hi)` limits how near flakes come. `haze=(amount, (r, g, b))`.
+- `light=(x, y)`: `fx3.FaceLight`; tune with `FaceLight(img, light, shadow=0.20, warm=0.07)` in `extra=[...]`.
+- `label=` is a `fx3.Tag` (screen space; corners `bl tl br tr`); `tag(b, text, t0, t1, corner=, pos=, size=, anchor=)`
+  adds the typing sound; `anchor=(x, y)` draws a leader to a point in the picture.
+- `fx3.Scrap(at, (w, h), t0, t_out=None, tilt=-2.5)`: put it before a `Draw` in `draws=[...]`.
+- `depth.py` needs torch + transformers (the voice environment has them) and the Depth Anything V2 Small model
+  (about 100 MB, Apache-2.0): used from the local Hugging Face cache, else downloaded on the first run (ask first).
+- voice.py: `BEATS = {"P19": [("phrase", seconds)]}`, `MASTER` (ffmpeg filter chain or None); batch voices are 48 kHz.
+- film.py / final.py / dub.py: `SWELL_DB` (the score's rise in pauses of ~0.8 s or more).
+
 ## Batch anatomy (`shots_bN.py`)
 ```python
 from film import Batch, Marks, Page

@@ -374,7 +374,9 @@ def mix(lang, voices, F):
         seg[-k:] *= np.linspace(1, 0, k)
         mus[i0:i0 + m] += seg
     venv = ndimage.uniform_filter1d(np.abs(voice), int(0.25 * SR))
-    duck = 10 ** (F["DUCK_DB"] * np.clip(venv / (np.percentile(venv, 95) * 0.25), 0, 1) / 20)
+    talk = np.clip(venv / (np.percentile(venv, 95) * 0.25), 0, 1)
+    quiet = ndimage.uniform_filter1d(ndimage.minimum_filter1d(1 - talk, int(0.7 * SR)).astype(np.float32), int(0.5 * SR))
+    duck = 10 ** (F["DUCK_DB"] * talk / 20) * 10 ** (F.get("SWELL_DB", 7) * quiet / 20)  # the score rises in the pauses, as in final.py
     mus *= np.sqrt(np.mean(voice ** 2)) * 10 ** (F["MUSIC_DB"] / 20) * duck
     end = int(2.5 * SR)
     mus[-end:] *= np.linspace(1, 0, end)

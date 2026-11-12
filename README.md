@@ -23,6 +23,14 @@ No After Effects, no AI video, no stock footage, no render farm. It runs on a Ma
 from a muff and landing, handwriting on the note, an acting face, a drawing made live, the con explained as drawings
 on a card, a rolling money counter, a glass-shatter transition, a crowd, a stamp, the note torn in two, a footnote).
 
+**New in v2 (Nov 2026):** camera moves with a purpose (an ease per segment, one move instead of a cut inside a
+picture), focus that pulls from one person to another, snow and rain that fall *behind* nearer things, soft form
+shading on the faces, typed paper tags that a push-in can never crop, insets on pinned scraps, pauses inside the
+narration, a voice mastering chain, and a score that rises in the pauses.
+▶ [`examples/chadwick/video/chadwick_b4_v2.mp4`](examples/chadwick/video/chadwick_b4_v2.mp4) (72 s; shot list:
+[`shots_b4_v2.py`](examples/chadwick/tools/shots_b4_v2.py)). Depth needs an optional extra:
+`pip install torch transformers`, then `python tools/depth.py` once per film (see `references/engine.md`).
+
 ---
 
 ## Contents
@@ -198,6 +206,7 @@ engine/                  the film engine (copied into each project's tools/)
   film.py                frames, camera, marks, sound, the render loop, the readability check
   seq.py                 the shot sequencer and builders: scene, drawin, page, map_shot, custom
   fx2.py                 living layers: Smoke, Breath, Flame, Light, Lift, Draw, Tear, Counter, the map
+  fx3.py, depth.py       v2: pulled focus, snow and rain in depth, haze, lit faces, paper tags, pinned scraps; depth maps
   signature.py, wr.py    faces that act, comic pages, stamps, tags, photos, footnotes, rays, haze
   kit.py, sketch.py, stages.py   labels, pages, maps, pen strokes, drawing order
   voice.py, import_voice.py      narration (Gemini TTS / your own audio) + word timings

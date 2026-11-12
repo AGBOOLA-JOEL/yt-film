@@ -48,6 +48,7 @@ HALO = dict(redh=(246, 238, 220), inkh=(246, 238, 220), creamh=(20, 16, 12))  # 
 DARK = 133  # mean luminance below which a mark counts as sitting on a dark area
 RNG = np.random.default_rng(5)
 MUSIC_DB, DUCK_DB = -25, -9  # score vs the voice overall, and a further dip while he talks: the voice always leads
+SWELL_DB = 7  # the score rises this much in real pauses (>= ~0.8 s without the voice) and sinks back before the next word
 
 
 IMG_EXT = (".png", ".jpg", ".jpeg", ".webp")  # any of these; PNG wins when two exist
@@ -126,6 +127,8 @@ def ease(u, kind="io"):
         return 1 - (1 - u) ** 3
     if kind == "in":
         return u ** 3
+    if kind == "back":  # a small overshoot, then settle
+        return 1 + 2.25 * (u - 1) ** 3 + 1.25 * (u - 1) ** 2
     return u * u * (3 - 2 * u)
 
 
@@ -433,18 +436,20 @@ class Shot:
         self.layers = None
 
     def cam(self, t):
-        """(cx, cy, h) at batch time t: keys are [(t, cx, cy, h), ...]; eased between keys."""
+        """(cx, cy, h) at batch time t: keys are [(t, cx, cy, h), ...]; eased between keys. A key may carry the ease
+        of the segment that ends on it: (t, cx, cy, h, "out" | "in" | "io" | "lin" | "back"), so a move can start
+        fast and settle ("out"), hold, then push on a word."""
         keys = self.kw["cam"]
         if t <= keys[0][0]:
-            v = list(keys[0][1:])
+            v = list(keys[0][1:4])
         else:
-            for (ta, *a), (tb, *b) in zip(keys, keys[1:]):
-                if t <= tb:
-                    u = ease((t - ta) / max(1e-6, tb - ta), self.kw.get("ease", "io"))
-                    v = [x + (y - x) * u for x, y in zip(a, b)]
+            for ka, kb in zip(keys, keys[1:]):
+                if t <= kb[0]:
+                    u = ease((t - ka[0]) / max(1e-6, kb[0] - ka[0]), kb[4] if len(kb) > 4 else self.kw.get("ease", "io"))
+                    v = [x + (y - x) * u for x, y in zip(ka[1:4], kb[1:4])]
                     break
             else:
-                v = list(keys[-1][1:])
+                v = list(keys[-1][1:4])
         dr = self.kw.get("drift", 1.0)
         v[0] += dr * (4 * math.sin(t * 0.6) + 2 * math.sin(t * 1.7))
         v[1] += dr * 3 * math.sin(t * 0.45 + 1)
@@ -645,6 +650,9 @@ class Batch:
                     if inside / area < (0.9 if is_text else 0.5):
                         out.append(f"{self.name} {img} {what}: {100 - 100 * inside / area:.0f}% out of frame at {t:.1f}s")
                         break
+            for f in s.kw.get("post", []):  # typed paper tags (fx3.Tag): readable for `read` s after they are typed
+                if hasattr(f, "type_t") and min(f.t1, end) - f.type_t[1] < read:
+                    out.append(f"{self.name} {img} words on a tag: readable {max(0, min(f.t1, end) - f.type_t[1]):.1f}s after typing (< {read}s)")
             if end - s.t0 < 1.2 and not s.kw.get("montage"):
                 out.append(f"{self.name} {img}: on screen only {end - s.t0:.1f}s (faster than the voice; montage=True if meant)")
             for f in s.kw.get("post", []):
@@ -658,6 +666,8 @@ class Batch:
                     if nxt - p["t"][2] < panel_hold:
                         out.append(f"{self.name} comic panel {p['img']}: held {nxt - p['t'][2]:.1f}s after it's painted (< {panel_hold}s)")
         for f, t0_, t1_ in self.overlays:
+            if hasattr(f, "type_t") and f.t1 - f.type_t[1] < read:
+                out.append(f"{self.name} words on a tag (overlay): readable {max(0, f.t1 - f.type_t[1]):.1f}s after typing (< {read}s)")
             if hasattr(f, "total"):
                 cards.setdefault(id(f), [f, [(0.0, self.end)]])
         for f, spans in cards.values():
@@ -947,7 +957,8 @@ class Batch:
             mus[:fi] *= np.linspace(0, 1, fi)
             mus[n - fo:] *= np.linspace(1, 0, fo)
             venv = ndimage.uniform_filter1d(np.abs(voice), int(0.25 * sr))
-            duck = 10 ** (DUCK_DB * np.clip(venv / (np.percentile(venv, 95) * 0.25), 0, 1) / 20)
+            talk = np.clip(venv / (np.percentile(venv, 95) * 0.25), 0, 1)
+            duck = 10 ** (DUCK_DB * talk / 20) * swell_gain(talk, sr)
             mus = mus / (np.sqrt(np.mean(mus ** 2)) + 1e-9) * np.sqrt(np.mean(voice ** 2)) * 10 ** (MUSIC_DB / 20) * duck
         fx = np.zeros(n, np.float32)
         for e in self.sfx:
@@ -970,6 +981,14 @@ class Batch:
 
 
 # ---------------------------------------------------------------- audio helpers
+
+
+def swell_gain(talk, sr):
+    """Gain for the score in the pauses: talk is 0-1 (1 while the narrator speaks). 1.0 under the voice and in short
+    gaps; up to SWELL_DB only well inside a pause of ~0.8 s or more, easing in and out."""
+    quiet = ndimage.minimum_filter1d(1 - talk, int(0.7 * sr))
+    quiet = ndimage.uniform_filter1d(quiet.astype(np.float32), int(0.5 * sr))
+    return 10 ** (SWELL_DB * quiet / 20)
 
 
 def _read(p):

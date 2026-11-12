@@ -152,6 +152,42 @@ are in `.env` (project first, then REPO): `GEMINI_API_KEY`, `YTF_CHANNEL`, voice
 - **Invent new effects per film** from what's in its images (every chimney, lamp, candle, breath, document, safe,
   crowd) and add them to fx2.
 
+## The v2 way (Nov 2026): camera with a purpose, depth, light, tags, pauses
+From a full review of Carnegie's Daughter: the camera barely moved, face close-ups were flat discs, labels were hard
+to read, insets floated in glowing ovals, explainer cards were mostly empty, and the mix never went quiet. A 72-second
+re-make of batch 4 fixed these; it is the reference now: `examples/chadwick/tools/shots_b4_v2.py`
+(video: `examples/chadwick/video/chadwick_b4_v2.mp4`). Everything still ADDS a layer or re-lights; nothing bends
+painted pixels and there is no 2.5D.
+- **Depth maps first**: after the images are checked, run `python tools/depth.py` once (build/depth/<image>.png, a
+  local model; see `references/engine.md`). Focus, depth weather and haze need them; without one a shot simply
+  renders the old way.
+- **Camera moves have a reason** (`cam=` keys with an ease per segment: `(t, cx, cy, h, "out" | "io" | "lin" | "back")`):
+  start on what the narrator is talking about and travel to what he names next; pull back to reveal ("every chair is
+  empty"), push on a word ("realized"), snap out on a punchline ("beautifully"). **Never cut between two views of the
+  same picture: make it one move.** A plain slow push-in is the last resort, not the default.
+- **Pull the focus** (`focus=`): a point or keys `[(t, point, amount)]`. The focus goes to whoever the sentence is
+  about (her, then him as he listens; the ladies, then through the glass to her house). Mid-pull frames are soft: keep
+  a pull under ~1 s.
+- **Weather lives in the scene**: with a depth map, snow and rain from LIVE fall behind whatever is nearer.
+  `snow_z=(0, 0.12)` keeps snow outside a window in an interior. `haze=(amount, colour)` puts mist in the distance.
+- **Faces get form** (`light=(x, y)` of the lamp or window): soft shading on the egg faces and hands, so a close-up
+  is no longer a flat disc. Frame faces looser than before and off-centre when someone else is in the shot.
+- **Labels are paper tags** (`label=` on scene/drawin, or `tag(b, text, t0, t1)`): typed, in a fixed corner of the
+  screen (default bottom left), so a push-in can never crop them. A name that should outlive a cut goes up with
+  `b.overlay(tag(...), t0, t1)`. `typed_label=True` gives the old on-picture label.
+- **Insets sit on a pinned scrap**: `draws=[Scrap(at, (w, h), t), Draw(...)]`, never a glowing oval (`card=True` is
+  retired for scenes).
+- **Cards fill the frame**: start the camera close on the words being typed (`page(..., cam=...)`), make them large,
+  then pull back to the new line. No near-empty card, no dead frames while the pen starts.
+- **Pauses** (`BEATS` in voice.py): `{"P19": [("He believed", 0.6)]}` adds a beat before a reveal, a punchline or a
+  turn; about one per passage at most. Cue shots by phrase (`b.t("...")`) so they follow the beats.
+- **Voice chain** (`MASTER` in voice.py): on by default for every batch (rumble out, de-ess, light compression,
+  presence, air). Listen to one batch before recording the rest; `MASTER = None` turns it off.
+- **The score breathes** (`SWELL_DB = 7` in film.py / final.py): it rises only inside real pauses (about 0.8 s or
+  more with no voice) and sinks back before the next word. Under the voice it is exactly where it was
+  (`MUSIC_DB`, `DUCK_DB`: never raise those).
+- `b.check()` also stops a render when a tag is readable for less than 1.5 s after it has typed.
+
 ## Pacing and readability (the picture never runs ahead of the voice)
 Enforced by `b.check()` (runs in stills.py and before every render, and **stops** a render on word problems):
 - Every word on screen stays readable: typed labels, leaders and handwriting finish ≥ 1.5 s before the cut and sit

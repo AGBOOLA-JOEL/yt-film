@@ -55,6 +55,13 @@ BATCHES = {"b1": ["P01", "P02", "P03", "P04"],             # the hook        <- 
            "b2": ["P05", "P06", "P07", "P08", "P09"],      # chapter 1          cut at natural breaks, 4-7 passages,
            "b3": ["P10", "P11", "P12", "P13", "P14"],      # chapter 2          about 65-100 s of narration each
            "test": ["T01", "T02", "T03", "T04", "T05"]}
+BEATS = {}    # longer pauses inside a passage: {"P19": [("He believed", 0.6)]} adds 0.6 s before that phrase (as Whisper
+              # wrote it; print the words first). For a reveal, a punchline, a turn. The score rises into them.
+MASTER = ("aresample=48000,highpass=f=75,equalizer=f=230:t=q:w=1.0:g=-1.5,equalizer=f=3600:t=q:w=1.2:g=1.0,"
+          "deesser=i=0.25:m=0.4:f=0.5:s=o,acompressor=threshold=0.1:ratio=2.5:attack=10:release=150:makeup=1.4,"
+          "aexciter=level_in=1:level_out=1:amount=1.0:drive=4:blend=0:freq=6500:ceil=16000")
+# ^ the voice chain on every batch (rumble out, less box, a little presence, de-ess, gentle compression, air above the
+#   model's 12 kHz ceiling). MASTER = None leaves the voice as recorded.
 GAPS = {("P04", "P05"): 1.8}   # a longer breath before an act change (default GAP between passages)
 SCRIPT = ROOT / ("TEST_SCRIPT.md" if "--test" in sys.argv else "SCRIPT.md")
 
@@ -134,6 +141,41 @@ def words(path, pid, offset):
             for w in ytf.transcribe(path)]
 
 
+def _norm(w):
+    return re.sub(r"[^a-z0-9]", "", w.lower())
+
+
+def add_beats(x, sr, ws, add):
+    """Longer pauses in passage audio x: add = [(phrase, extra s)], each placed in the quietest part of the gap before
+    that phrase; ws = the passage's words (times relative to x), shifted in place. Returns the new audio."""
+    cuts, cur = [], 0
+    for phrase, extra in add:
+        q = [_norm(w) for w in phrase.split()]
+        i = next((i for i in range(cur, len(ws)) if [_norm(w["w"]) for w in ws[i:i + len(q)]] == q), None)
+        if i is None or i == 0:
+            print(f"    beat not placed: {phrase!r} (print the words: Whisper may spell it differently)", flush=True)
+            continue
+        cur = i + 1
+        a, z = ws[i - 1]["e"], ws[i]["s"]
+        seg, win = x[int(a * sr):int(z * sr)], int(0.02 * sr)
+        if len(seg) > 2 * win:
+            at = int(a * sr) + int(np.argmin(np.convolve(seg ** 2, np.ones(win) / win, mode="valid"))) + win // 2
+        else:
+            at = int((a + z) / 2 * sr)
+        cuts.append((at, extra, i))
+    out, last, f = [], 0, int(0.008 * sr)
+    x = x.copy()
+    for at, extra, i in cuts:
+        seg = x[last:at].copy()
+        seg[-f:] *= np.linspace(1, 0, f)
+        out += [seg, np.zeros(int(extra * sr), x.dtype)]
+        x[at:at + f] *= np.linspace(0, 1, f)
+        last = at
+        for w in ws[i:]:
+            w["s"], w["e"] = round(w["s"] + extra, 3), round(w["e"] + extra, 3)
+    return np.concatenate(out + [x[last:]])
+
+
 def build(batch, pids, P):
     parts, W, t = [], [], 0.0
     for i, pid in enumerate(pids):
@@ -141,10 +183,20 @@ def build(batch, pids, P):
             g = GAPS.get((pids[i - 1], pid), GAP)
             parts.append(np.zeros(int(g * SR))); t += g
         x, sr = sf.read(passage_wav(pid, P[pid]))
-        W += words(OUT / f"{pid}.wav", pid, t)
+        ws = words(OUT / f"{pid}.wav", pid, 0.0)
+        if BEATS.get(pid):
+            x = add_beats(x, sr, ws, BEATS[pid])
+        W += [dict(w, s=round(w["s"] + t, 3), e=round(w["e"] + t, 3)) for w in ws]
         parts.append(x); t += len(x) / sr
     y = np.concatenate(parts)
-    sf.write(OUT / f"{batch}_vo.wav", y, SR)
+    if MASTER:
+        raw = OUT / f"{batch}_vo_raw.wav"
+        sf.write(raw, y, SR)
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(raw), "-af", MASTER, "-ar", "48000", "-ac", "1",
+                        str(OUT / f"{batch}_vo.wav")], check=True)
+        raw.unlink()
+    else:
+        sf.write(OUT / f"{batch}_vo.wav", y, SR)
     (OUT / f"{batch}_words.json").write_text(json.dumps(dict(duration=len(y) / SR, words=W), indent=0), encoding="utf-8")
     print(f"{batch}: {len(y) / SR:.1f}s, {len(W)} words", flush=True)
 

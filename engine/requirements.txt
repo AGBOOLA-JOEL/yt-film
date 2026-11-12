@@ -8,3 +8,5 @@ soundfile>=0.12
 # word timings: mlx-whisper on Apple Silicon Macs (GPU, fast); faster-whisper everywhere else (Windows, Intel Macs, Linux)
 mlx-whisper>=0.4; sys_platform == "darwin" and platform_machine == "arm64"
 faster-whisper>=1.1; sys_platform != "darwin" or platform_machine != "arm64"
+# optional, for depth maps (tools/depth.py: focus, weather in depth, haze). Not installed by default:
+#   pip install torch transformers

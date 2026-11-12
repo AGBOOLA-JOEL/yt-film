@@ -44,7 +44,7 @@ def view_box(keys):
     """The part of the image the camera keeps in view through every key: (x0, y0, x1, y1)."""
     boxes = []
     for k in keys:
-        cx, cy, h = k[1:] if len(k) == 4 else k
+        cx, cy, h = k[1:4] if len(k) >= 4 else k
         h = min(SH, h)
         w = h * 16 / 9
         cx, cy = min(max(cx, w / 2), SW - w / 2), min(max(cy, h / 2), SH - h / 2)

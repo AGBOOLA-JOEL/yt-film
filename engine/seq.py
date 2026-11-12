@@ -23,6 +23,8 @@ import signature as sg
 import wr
 from film import Batch, Marks
 from fx2 import Live, Smoke, Breath, Flame, Light, Lift, Draw, Tear, Counter, Leaves, Sparkle, lamps, u8, clean_text
+import fx3
+from fx3 import Focus, Haze, Snow, Rain, FaceLight, Scrap, Tag, tag
 
 COAL, COAL_LIT = (104, 100, 104), (176, 170, 172)
 STEAM, STEAM_LIT = (196, 196, 200), (236, 236, 238)
@@ -82,47 +84,88 @@ def keys(move, t0, t1, zoom=None):
     return kit.cam(move, t0, t1) if zoom is None else [(t0, *zoom[0]), (t1, *zoom[1])]
 
 
-def scene(img, move="in", zoom=None, act=None, label=None, corner="tl", draws=(), marks=None, post=(), fx=(), extra=(),
-          trans=None, live=True, label_at=0.4, shake=None, swap=None):
-    """One picture with its living layers. draws = [Draw(...)] (made live: pen sprite and sound), extra = more fx2
-    effects, act = face cues (only on audited faces), label = typed place/date, kept inside the camera's view."""
+def _cam(cam, move, t0, t1, zoom):
+    """Camera keys: cam = a list of (t, cx, cy, h[, ease]) or a function (t0, t1) -> that list; else move / zoom."""
+    if cam is not None:
+        return cam(t0, t1) if callable(cam) else list(cam)
+    return keys(move, t0, t1, zoom)
+
+
+def _label(b, text, t0, t1, corner, at):
+    """A place/date/name as a typed paper tag in a fixed corner of the screen (never cropped by the camera)."""
+    return tag(b, text, t0 + at, t1 - 0.3, corner=corner)
+
+
+def scene(img, move="in", zoom=None, act=None, label=None, corner="bl", draws=(), marks=None, post=(), fx=(), extra=(),
+          trans=None, live=True, label_at=0.4, shake=None, swap=None, cam=None, focus=None, light=None, haze=None,
+          snow_z=None, typed_label=False):
+    """One picture with its living layers. draws = [Scrap(...), Draw(...)] (made live: pen sprite and sound; they stay
+    sharp), extra = more fx2 / fx3 effects, act = face cues (only on audited faces), label = a typed paper tag in
+    `corner` ("bl" "tl" "br" "tr"); typed_label=True writes it on the picture the old way instead.
+    cam = [(t, cx, cy, h[, ease]), ...] or a function (t0, t1) -> keys: several keys, an ease per segment.
+    With a depth map (tools/depth.py): focus = a point (x, y) or a depth, or keys [(t, point | depth, amount)] to pull
+    the focus; snow and rain from LIVE fall in depth (snow_z=(0, 0.12) keeps snow outside a window);
+    haze = (amount, (r, g, b)) mist in the distance. light = (x, y) of the lamp or window: form shading on the faces."""
     def run(b, t0, t1):
-        k = keys(move, t0, t1, zoom)
+        k = _cam(cam, move, t0, t1, zoom)
         src, sfx, spost = living(img, t0, t1) if live else ([], [], [])
-        m = marks
+        src, sfx, pst, m = list(src), list(sfx), list(spost) + list(post), marks
+        deep = fx3.has_depth(img)
+        if light:
+            src.append(FaceLight(img, light))
+        if deep:
+            if haze:
+                src.append(Haze(img, *haze))
+            for e in [e for e in sfx if e[0] in ("snow", "rain")]:  # weather falls in depth, behind what is nearer
+                sfx.remove(e)
+                src.append(Snow(img, e[1], z=snow_z or (0.05, 1.0), seed=int(t0 * 7) % 97) if e[0] == "snow" else Rain(img, e[1]))
+        src += list(extra)
+        if focus is not None and deep:
+            fk = focus if isinstance(focus, list) else [(t0, focus, 0.7)]
+            src.append(Focus(img, fk))
+        src += list(draws)
         if label:
-            m = kit.label(label, t0 + label_at, corner=corner, keys=k, marks=m)
-        kw = dict(marks=m, post=list(spost) + list(post), fx=list(sfx) + list(fx))
+            if typed_label:
+                m = kit.label(label, t0 + label_at, corner=corner, keys=k, marks=m)
+            else:
+                pst.append(_label(b, label, t0, t1, corner, label_at))
+        kw = dict(marks=m, post=pst, fx=sfx + list(fx))
         if trans:
             kw["trans"] = trans
         if shake:
             kw["shake"] = shake
         if act:
-            wr.sc(b, t0, t1, img, keys=k, src=u8(*(list(src) + list(extra) + list(draws))), act=act, **kw)
-        elif draws or src or extra:
-            b.custom(t0, Live(img, list(src) + list(extra) + list(draws)), k, img, **kw)
+            wr.sc(b, t0, t1, img, keys=k, src=u8(*src), act=act, **kw)
+        elif src:
+            b.custom(t0, Live(img, src), k, img, **kw)
         else:
             b.scene(t0, img, k, **kw)
     return run
 
 
-def drawin(img, move="in", zoom=None, ink=(0.0, 2.0), flood=(1.6, 3.0), marks=None, label=None, trans=("dissolve", 0.3), post=(), fx=()):
+def drawin(img, move="in", zoom=None, ink=(0.0, 2.0), flood=(1.6, 3.0), marks=None, label=None, trans=("dissolve", 0.3), post=(), fx=(),
+           cam=None, corner="bl", typed_label=False):
     """A scene that draws itself (its _lines version inks in, then the paint floods), times relative to the cue."""
     def run(b, t0, t1):
-        k = keys(move, t0, t1, zoom)
-        m = marks
+        k = _cam(cam, move, t0, t1, zoom)
+        m, pst = marks, list(post)
         if label:
-            m = kit.label(label, t0 + 0.4, keys=k, marks=m)
+            if typed_label:
+                m = kit.label(label, t0 + 0.4, keys=k, marks=m)
+            else:
+                pst.append(_label(b, label, t0, t1, corner, 0.4))
         src, sfx, spost = living(img, t0, t1)
         b.drawin(t0, img, k, ink=img + "_lines", flood=True, ink_t=(t0 + ink[0], t0 + ink[1]), flood_t=(t0 + flood[0], t0 + flood[1]),
-                 marks=m, trans=trans, post=list(spost) + list(post), fx=list(sfx) + list(fx))
+                 marks=m, trans=trans, post=list(spost) + pst, fx=list(sfx) + list(fx))
     return run
 
 
-def page(base, items=(), marks=None, zoom=None, post=(), fx=(), trans=("dissolve", 0.3)):
-    """A blank base drawn on live: items are fx2 effects (Draw, Tear...), marks are words/arrows (Marks)."""
+def page(base, items=(), marks=None, zoom=None, post=(), fx=(), trans=("dissolve", 0.3), cam=None):
+    """A blank base drawn on live: items are fx2 effects (Draw, Tear...), marks are words/arrows (Marks). Fill the
+    frame: start the camera close on what is being written (cam=), then pull back; never leave the card mostly empty."""
     def run(b, t0, t1):
-        k = [(t0, *zoom[0]), (t1, *zoom[1])] if zoom else [(t0, 887, 443, 887), (t1, 887, 443, 850)]
+        k = _cam(cam, None, t0, t1, None) if cam is not None else (
+            [(t0, *zoom[0]), (t1, *zoom[1])] if zoom else [(t0, 887, 443, 887), (t1, 887, 443, 850)])
         b.custom(t0, Live(base, list(items)), k, base, marks=marks, post=list(post), fx=list(fx), trans=trans)
     return run
 

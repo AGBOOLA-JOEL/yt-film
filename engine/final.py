@@ -23,6 +23,7 @@ FILM = ROOT.name
 R = ROOT / "renders"
 SR = 48000
 MUSIC_DB, DUCK_DB = -25, -9  # score vs the voice overall, and a further dip while the narrator talks: the voice always leads
+SWELL_DB = 7  # the score rises this much in real pauses (>= ~0.8 s without the voice) and sinks back before the next word
 BATCHES = ["b1", "b2", "b3", "cta"]          # every batch in order, then the ending
 # (cue, offset into the cue at the section start) per batch; None = the previous batch's cue carries on
 MUSIC = {"b1": ("m_hook", 0.0), "b2": ("m_rise", 0.0), "b3": ("m_end", 0.0), "cta": ("m_end", None)}
@@ -90,7 +91,9 @@ def main():
         seg[-k:] *= np.linspace(1, 0, k)
         mus[i0:i0 + m] += seg
     venv = ndimage.uniform_filter1d(np.abs(voice), int(0.25 * SR))
-    duck = 10 ** (DUCK_DB * np.clip(venv / (np.percentile(venv, 95) * 0.25), 0, 1) / 20)
+    talk = np.clip(venv / (np.percentile(venv, 95) * 0.25), 0, 1)
+    film.SWELL_DB = SWELL_DB
+    duck = 10 ** (DUCK_DB * talk / 20) * film.swell_gain(talk, SR)
     mus *= np.sqrt(np.mean(voice ** 2)) * 10 ** (MUSIC_DB / 20) * duck
     end = int(2.5 * SR)
     mus[-end:] *= np.linspace(1, 0, end)
