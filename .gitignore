@@ -1,0 +1,16 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db
+# fonts are downloaded by the setup scripts
+fonts/*.ttf
+# caches and renders inside the example (the example's inputs are committed, its outputs are not)
+examples/*/build/up/
+examples/*/build/norm/
+examples/*/build/grid/
+examples/*/build/*.npz
+examples/*/build/*.json
+examples/*/renders/
+examples/*/dubs/

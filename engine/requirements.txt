@@ -1,0 +1,10 @@
+# yt-film engine (Python 3.10-3.12; 3.11 recommended). Tested versions are in requirements-lock.txt.
+numpy>=1.26
+opencv-python-headless>=4.9
+pillow>=10.1
+scikit-image>=0.22
+scipy>=1.11
+soundfile>=0.12
+# word timings: mlx-whisper on Apple Silicon Macs (GPU, fast); faster-whisper everywhere else (Windows, Intel Macs, Linux)
+mlx-whisper>=0.4; sys_platform == "darwin" and platform_machine == "arm64"
+faster-whisper>=1.1; sys_platform != "darwin" or platform_machine != "arm64"
