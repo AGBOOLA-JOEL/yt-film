@@ -10,6 +10,31 @@ with synthesised sound, a ducked score and YouTube-ready loudness.
 
 No After Effects, no AI video, no stock footage, no render farm. It runs on a Mac or a Windows PC.
 
+### Install in one step: copy this into Claude Code
+Open [Claude Code](https://claude.com/claude-code) (the desktop app or `claude` in a terminal), paste the prompt
+below, and let Claude do the installing. It clones this repo, reads these docs and the install runbook, sets up
+Python, FFmpeg and the engine, checks everything, and shows you a working example. Click the copy button at the
+top right of the box:
+
+```text
+Install the yt-film skill on this computer and set it up for me.
+
+Repo: https://github.com/AGBOOLA-JOEL/yt-film
+
+1. Clone it into my personal Claude skills folder: ~/.claude/skills/yt-film on Mac/Linux, or
+   %USERPROFILE%\.claude\skills\yt-film on Windows. If it's already there, run git pull instead.
+2. Read README.md and references/install.md in that folder, then follow the "Install runbook (for Claude)"
+   in references/install.md step by step.
+3. Ask me before installing anything system-wide (Homebrew, winget, apt packages), and tell me what each one is for.
+4. Run the setup script for my system, then scripts/doctor.py, and fix every [!!] line until everything says [ok].
+5. Ask me for my channel name and whether I have a Gemini API key. If I do, tell me exactly where to paste it in
+   .env myself; never write my key anywhere else or show it back to me.
+6. Prove it works: create the Chadwick example project and show me a stills sheet of batch b1 (no rendering).
+7. Finish with a short summary: what was installed, where, what's left for me, and remind me to restart Claude Code
+   so the skill loads.
+```
+Prefer to do it yourself? See [Install](#install).
+
 <p align="center">
   <img src="examples/chadwick/look/comic_page.jpg" width="32%">
   <img src="examples/chadwick/look/con_drawn_on_envelope.jpg" width="32%">
@@ -77,12 +102,19 @@ narration, a voice mastering chain, and a score that rises in the pauses.
 
 ## Install
 
-**The easy way:** open Claude Code and say:
+**The easy way (recommended):** paste the [install prompt](#install-in-one-step-copy-this-into-claude-code) into
+Claude Code. Claude follows the runbook in [`references/install.md`](references/install.md): it clones the repo into
+your skills folder, asks before installing system tools, runs the setup script, fixes everything the doctor reports,
+helps you fill in `.env` (you paste your key yourself), and shows you a stills sheet from the example to prove it
+works. It takes 10–20 minutes, mostly downloads.
 
-> Install the yt-film skill from https://github.com/AGBOOLA-JOEL/yt-film and set it up on this computer.
-
-Claude clones it into `~/.claude/skills/yt-film`, runs the right setup script, checks everything with the doctor
-and fixes what's missing.
+**Already installed? Copy one of these into Claude Code:**
+```text
+Update the yt-film skill in my Claude skills folder: git pull, re-run the setup script if requirements changed, run scripts/doctor.py and fix anything it reports, then tell me what changed.
+```
+```text
+Start a new yt-film project. Ask me about my channel, the format and the look first (references/formats.md and references/art-styles.md), then follow the yt-film skill from the story onwards.
+```
 
 **By hand, macOS** (needs [Homebrew](https://brew.sh)):
 ```bash

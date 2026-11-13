@@ -1,8 +1,61 @@
 # Installing yt-film (macOS and Windows)
 
-The fastest way: give Claude Code the repo link and say **"install this skill and set it up"**. Claude clones it,
-runs the setup script for your system and fixes whatever `doctor.py` reports. The steps below are what it does, so
-you can also do them by hand.
+The fastest way: paste the install prompt from the top of the [README](../README.md) into Claude Code. Claude
+follows the runbook below. Everything after it is the same work done by hand.
+
+## Install runbook (for Claude)
+
+Follow these steps in order. Work out the system first and use its commands throughout. Say what each step is
+doing in one line; don't stop between steps unless a step says to ask.
+
+**0. Find out where you are.** OS (`uname -s` / `$env:OS`), CPU (Apple Silicon or Intel/AMD), RAM, free disk, and
+whether `git`, `python3.11` (Windows: `py -3.11`), `ffmpeg` and the package manager (macOS: `brew`; Windows:
+`winget`; Linux: `apt`) exist. Tell the user in two lines what is there and what is missing.
+
+**1. The repo.** Target `~/.claude/skills/yt-film` (macOS/Linux) or `%USERPROFILE%\.claude\skills\yt-film`
+(Windows). If it exists and is this repo, `git pull`; else
+`git clone https://github.com/AGBOOLA-JOEL/yt-film.git <target>`. No git: ask, then install it
+(`xcode-select --install` / `winget install Git.Git` / `sudo apt install git`).
+
+**2. System tools (ask first).** If Homebrew (macOS) or winget (Windows) is missing, give the user the official
+install step (https://brew.sh; Windows 10: "App Installer" from the Microsoft Store) and wait: it needs their
+password or a store install. For Python 3.11 and FFmpeg the setup script installs what's missing; tell the user
+it will and why ("Python runs the engine, FFmpeg encodes every video and sound"), and get a yes before running it.
+Linux: `sudo apt install python3.11 python3.11-venv ffmpeg fonts-dejavu` (the user runs sudo).
+
+**3. Setup script.** From the repo folder:
+- macOS: `bash setup/install_mac.sh`
+- Windows (PowerShell): `powershell -ExecutionPolicy Bypass -File setup\install_windows.ps1`
+- Linux: `python3.11 -m venv .venv && .venv/bin/pip install -r engine/requirements.txt`, fonts from `fonts/README.md`
+It is safe to run again. On Windows, if Python or FFmpeg "isn't recognized" right after installing, they are on the
+PATH only in a new terminal: run the script again from a fresh PowerShell (or call them by full path).
+
+**4. Doctor.** `.venv/bin/python scripts/doctor.py` (Windows `.venv\Scripts\python scripts\doctor.py`). Fix every
+`[!!]` line using its hint and the troubleshooting table (`references/troubleshooting.md`), then run it again until
+everything says `[ok]`. Don't move on with a failing line unless the user agrees (e.g. no Gemini key yet).
+
+**5. Settings (`.env` in the repo folder).** Ask for the channel name and set `YTF_CHANNEL`. Ask whether they have
+a Gemini API key (free at https://aistudio.google.com/apikey; voice, music, crowd murmur, dubs). **The key is theirs
+to paste:** open or name the file and the line (`GEMINI_API_KEY=`) and let them paste it; never type, print, log or
+store the key anywhere else. No key is fine: they can bring their own voice (voice.md) and music (music.md).
+Optional: `YTF_WORKSPACE` (where films live; on Windows a short local path such as `C:/films`, not OneDrive) and
+`YTF_LOOK` (their engine look, `references/art-styles.md`).
+
+**6. Prove it works (no API key, no render).**
+```
+.venv/bin/python scripts/new_project.py chadwick --example chadwick
+cd <workspace>/chadwick/tools && <repo>/.venv/bin/python stills.py b1
+```
+Show the user `renders/stills_b1.jpg` (it takes about 30 s). If it fails, read the error, fix, and re-run.
+
+**7. Optional extras (ask).** Depth effects: `.venv/bin/python -m pip install torch transformers` (about 1 GB), then
+`python tools/depth.py` per film. Slow machine or 8 GB RAM: suggest `YTF_JOBS=1` and the tips in performance.md.
+
+**8. Finish.** Summarise in a few lines: where the skill is, what was installed, what the doctor says, what is left
+for the user (their key, Homebrew, a restart). Tell them to **restart Claude Code** so the skill loads, then ask
+*"what skills do you have?"* (yt-film should be listed) and start a film with *"Start a new yt-film project"*.
+
+---
 
 ## What gets installed
 
@@ -25,13 +78,12 @@ Claude Code loads personal skills from `~/.claude/skills/<name>/`. Clone straigh
 
 **macOS** (Terminal):
 ```bash
-git clone https://github.com/<you>/yt-film.git ~/.claude/skills/yt-film
+git clone https://github.com/AGBOOLA-JOEL/yt-film.git ~/.claude/skills/yt-film
 ```
 **Windows** (PowerShell):
 ```powershell
-git clone https://github.com/<you>/yt-film.git "$env:USERPROFILE\.claude\skills\yt-film"
+git clone https://github.com/AGBOOLA-JOEL/yt-film.git "$env:USERPROFILE\.claude\skills\yt-film"
 ```
-Private repo: run `gh auth login` first (GitHub CLI), or use a personal access token when Git asks for a password.
 
 Prefer it inside one project only? Clone into `<project>/.claude/skills/yt-film` instead. Either way, restart Claude
 Code and ask *"what skills do you have?"*: `yt-film` should be listed.

@@ -23,8 +23,8 @@ borrowed millions as Andrew Carnegie's secret daughter): its images, script, voi
 
 **`REPO`** below is this skill's folder (where this file is). **`PY`** is its Python: `REPO/.venv/bin/python` on
 macOS/Linux, `REPO\.venv\Scripts\python.exe` on Windows. Always run engine commands with `PY`, from the project's
-`tools/` folder. If `.venv` doesn't exist, set up first (`references/install.md`): run `setup/install_mac.sh` or
-`setup/install_windows.ps1`, then `scripts/doctor.py`, and fix every `[!!]` line.
+`tools/` folder. If `.venv` doesn't exist, set up first: follow the **Install runbook (for Claude)** in
+`references/install.md` step by step (ask before system-wide installs; the user pastes their own API key).
 
 ## Ground rules
 - **Never render without the user's go-ahead.** Check with `stills.py` (a contact sheet in ~30 s). Batch renders,
