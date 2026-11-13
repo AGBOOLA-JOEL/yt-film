@@ -36,6 +36,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))  # sketch.py and stages
 import sketch as sk  # noqa: E402  (pen strokes, handwriting, tool sprites)
 import stages  # noqa: E402  (drawing order of an ink image)
 import ytf  # noqa: E402  (portable paths, fonts, settings)
+import look  # noqa: E402  (the film's look: grade, grain, ink, paper, accent, fonts; YTF_LOOK / look.json)
 
 PREVIEW = "--preview" in sys.argv
 OW, OH = (960, 540) if PREVIEW else (1920, 1080)
@@ -43,8 +44,9 @@ FPS = 12 if PREVIEW else 24
 SW, SH = 1774, 887  # source image size
 UP = 2  # working images are upscaled 2x
 INC, BUILD = ROOT / "incoming", ROOT / "build"
-COL = dict(ink=(34, 27, 22), red=(190, 44, 36), cream=(246, 238, 220), redh=(190, 44, 36), inkh=(34, 27, 22), creamh=(246, 238, 220))
-HALO = dict(redh=(246, 238, 220), inkh=(246, 238, 220), creamh=(20, 16, 12))  # layers drawn over a soft contrasting halo
+_I, _A, _C = look.rgb("ink"), look.rgb("accent"), look.rgb("light")  # "red" is the look's accent colour
+COL = dict(ink=_I, red=_A, cream=_C, redh=_A, inkh=_I, creamh=_C)
+HALO = dict(redh=_C, inkh=_C, creamh=look.dark())  # layers drawn over a soft contrasting halo
 DARK = 133  # mean luminance below which a mark counts as sitting on a dark area
 RNG = np.random.default_rng(5)
 MUSIC_DB, DUCK_DB = -25, -9  # score vs the voice overall, and a further dip while he talks: the voice always leads
@@ -135,7 +137,7 @@ def ease(u, kind="io"):
 # ---------------------------------------------------------------- annotations (drawn on top of an image)
 
 
-TYPE_FONT = ytf.font("type")
+TYPE_FONT = ytf.font(look.L.type_font)
 
 
 class LineText(sk.Text):
@@ -525,7 +527,11 @@ class Finish:
     """The film's finish on every frame: a gentle grade (soft contrast, warm highlights, slightly cool lifted
     shadows, like printed gouache under a lamp), a fine moving film grain, and a soft vignette."""
 
-    def __init__(self, grain=3.2, vig=0.13, seed=31):
+    def __init__(self, grain=None, vig=None, seed=31):
+        L = look.L
+        grain = L.grain if grain is None else grain
+        vig = L.vignette if vig is None else vig
+        warm, con, sht, self.sat = L.warmth, L.contrast, L.shadow_tint, L.saturation
         r = np.random.default_rng(seed)
         self.grain = [cv2.GaussianBlur(r.standard_normal((OH, OW)).astype(np.float32), (0, 0), 0.6 * OW / 1920) * grain * 1.6
                       for _ in range(6)]
@@ -533,16 +539,20 @@ class Finish:
         d = np.hypot((xx - OW / 2) / (OW / 2), (yy - OH / 2) / (OH / 2)) / 1.414
         self.vig = (1 - vig * np.clip((d - 0.35) / 0.65, 0, 1) ** 1.6)[..., None]
         x = np.arange(256, dtype=np.float32) / 255
-        curve = x + 0.06 * np.sin(2 * np.pi * (x - 0.5)) * -1 * 0.5  # a soft S
-        self.lut = np.stack([np.clip(curve * 255 * 1.012 + 1.5, 0, 255),           # R: a touch warm
-                             np.clip(curve * 255 * 1.0 + 1.0, 0, 255),
-                             np.clip(curve * 255 * 0.975 + 5.0 * (1 - x) ** 2, 0, 255)], 1).astype(np.float32)
+        curve = x - con * np.sin(2 * np.pi * (x - 0.5))  # a soft S (contrast)
+        self.lut = np.stack([np.clip(curve * 255 * (1 + 0.012 * warm) + 1.5 * max(0, warm), 0, 255),   # R: warmth
+                             np.clip(curve * 255 * 1.0 + 1.0 * max(0, warm), 0, 255),
+                             np.clip(curve * 255 * (1 - 0.025 * warm) + sht * (1 - x) ** 2, 0, 255)], 1).astype(np.float32)
+        self.grain_on = grain > 0
 
     def __call__(self, img, fi):
         i = np.clip(img, 0, 255).astype(np.uint8)
         g = np.stack([self.lut[i[..., c], c] for c in range(3)], -1)
         lum = g.mean(2, keepdims=True) / 255
-        g = g + self.grain[(fi // 2) % len(self.grain)][..., None] * (0.35 + 1.3 * lum * (1 - lum) * 2)
+        if self.sat != 1.0:
+            g = lum * 255 + (g - lum * 255) * self.sat
+        if self.grain_on:
+            g = g + self.grain[(fi // 2) % len(self.grain)][..., None] * (0.35 + 1.3 * lum * (1 - lum) * 2)
         return g * self.vig
 
 
@@ -620,7 +630,9 @@ class Batch:
         - a mark that stays on screen less than `read` s after it's finished (the shot cuts too soon);
         - a footnote card (anything with .total() and .t_out) on screen less than its typing time + `note_read` s, or
           missing from a shot it spans;
-        - a comic panel held less than `panel_hold` s after it's painted, before the next panel or the dive.
+        - a comic panel held less than `panel_hold` s after it's painted, before the next panel or the dive;
+        - a picture with nothing new drawn for more than flow.HOLD_BARE s, or a fade to black at a batch seam
+          that isn't an act break (flow.py; references/storytelling.md).
         Returns the list of problems (and prints them)."""
         shots = sorted(self.shots, key=lambda s: s.t0)
         out, cards = [], {}
@@ -681,6 +693,11 @@ class Batch:
                 t = max(t, b_)
             if t < f.t_out - 0.05:
                 out.append(f"{self.name} footnote {f.n}: disappears at {t:.1f}s (a shot it spans doesn't carry it)")
+        try:  # story flow: pictures held bare too long, fades to black at batch seams (flow.py)
+            import flow
+            out += flow.check(self, shots)
+        except ImportError:
+            pass
         if not quiet:
             print("\n".join(out) if out else f"{self.name}: check ok")
         return out
@@ -1262,7 +1279,7 @@ def _sfx(e, n, sr):
     return out
 
 
-PEN_DB = -27  # the drawing tool against the voice's loudness: heard, never competing (a further -7 dB while he talks)
+PEN_DB = look.L.pen_db if look.L.pen_db is not None else -120  # the drawing tool against the voice's loudness: heard, never competing (a further -7 dB while he talks)
 TOOLS = {  # band (Hz) and level of each tool's sound: a soft graphite grain, dry chalk, a near-silent brush
     "pencil": (450, 3400, 1.0), "red": (450, 3400, 1.0), "pen": (800, 4200, 0.8), "chalk": (300, 3000, 1.15),
     "brush": (140, 1100, 0.4)}
@@ -1428,7 +1445,7 @@ MEDIA = dict(graphite=dict(col=(58, 56, 62), tool="pencil"),  # pencil on paper:
              chalk=dict(col=(236, 236, 226), tool="chalk"),    # chalk on a board: dry, broken, a little dust
              sumi=dict(col=(22, 18, 18), tool="brush"),          # brush ink on washi: dense, soft bleeding edge
              carve=dict(col=(234, 224, 186), tool="pencil"))     # cut into bamboo or wood: the pale fibre shows
-ACCENT = (178, 38, 30)  # red pencil, the seal
+ACCENT = look.rgb("accent")  # red pencil, the seal (the look's accent)
 SEAL_FONT = ytf.font("seal")
 
 

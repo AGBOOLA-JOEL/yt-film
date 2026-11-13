@@ -31,8 +31,13 @@ macOS/Linux, `REPO\.venv\Scripts\python.exe` on Windows. Always run engine comma
   previews, the ending and the final join take minutes to hours: say what you'd render and how long it may take, and
   wait for a yes. Don't re-render anything that's already rendered unless it changed and the user wants it.
 - **Ask the user's routes once per project**: which image tool (`references/image-generation.md`), voice (Gemini
-  TTS or their own: `references/voice.md`), music (Lyria or their own: `references/music.md`), art style (the
-  suggested egg-headed pastel look or their own: `references/art-styles.md`), their niche and channel name.
+  TTS or their own: `references/voice.md`), music (Lyria or their own: `references/music.md`), their niche and channel name, and
+  the three choices that make the channel theirs: **the image style** (the opener: gouache, flat editorial, noir,
+  chalk, comic, storybook, blueprint, or their own; characters or none), **the engine look** (`YTF_LOOK`: gouache,
+  clean, noir, chalk, comic, storybook, blueprint; `look.json` for single values) and **the format** (`story`,
+  `explainer`, `countdown`, `rise-fall`, `storytime`, `kids`, `summary`, `case-study`, `news`):
+  `references/art-styles.md`, `references/formats.md`. Don't default to the example's pastel true-story style; if
+  the user has no preference, show the options in one short table and recommend one that fits their niche.
 - The user's niche is theirs: don't steer them to history or to the example's subject. The example is a reference
   for techniques, not a template for topics.
 - Windows: paths with forward slashes work; long jobs run in the background; speed settings in
@@ -63,25 +68,33 @@ are in `.env` (project first, then REPO): `GEMINI_API_KEY`, `YTF_CHANNEL`, voice
 (`.env.example` lists them all). `engine/ytf.py` finds fonts, the key, Whisper and the shared art on any OS.
 
 ## The order of work
-0. **Pick the story** if not given: 3–5 candidates with gap checks (`references/story-finding.md`).
+0. **Pick the story** if not given: 3–5 candidates with gap checks (`references/story-finding.md`). Start the
+   project with its format and look: `PY REPO/scripts/new_project.py <name> --format <format> --look <look>`
+   (writes the format's spine template into OUTLINE.md, `YTF_FORMAT` and `YTF_LOOK` into `.env`). Test a new style
+   on two images with `stills.py` before writing the full guide (`references/art-styles.md`, last section).
 1. **Story and facts**: research; `OUTLINE.md` with sources. Mark anything unconfirmed and word around it later
    ("reportedly"), never state it as fact. Decide the hook (`references/hooks.md`: never the same type as the
-   user's last three films).
-2. **Image guide first** (`references/image-guide.md`, written for the user's route). It defines the story beat by
-   beat through its shots. Aim for **~150 images**: style card, cast sheets, ~120 scene shots with coverage (W wide,
-   M medium, F face close-up as an EDIT, D detail, P point of view), 4 scenes with `_lines` versions, ~9 sketch
-   sheets + `_lines`, ~7 blank story objects ("bases": a notebook, an old map, a card, a ledger, an envelope, a
+   user's last three films). Then write the **spine** at the top of `OUTLINE.md` (`references/storytelling.md`):
+   one question the film answers and 8–12 beats joined by "so" / "but"; the first wrong act or deciding moment by
+   ~15% of the film; one or two backstory passages per main person. Show it to the user before the image guide.
+2. **Image guide first** (`references/image-guide.md`, written for the user's route). It follows the spine and the way the
+   film is narrated (**show, then draw**: each beat's row names the line it serves and what gets drawn on or after
+   it). Aim for **~150 images**: style card, cast sheets, ~100 scene shots with coverage (W wide, M medium, F face
+   close-up as an EDIT, D detail, P point of view), 6 scenes with `_lines` versions, 12 sketch sheets + `_lines`,
+   ~10 blank story objects ("bases": a notebook, an old map, a card, a ledger, an envelope, a
    telegram, a newspaper). Exact filenames and folders. Consistency rules: `references/consistency.md`.
 3. **Check images** as groups arrive (hands, faces, era details, no text, shape: images arrive ~16:9 and are
    centre-cropped to 2:1, so nothing important at the very top/bottom). Manual downloads: `scripts/sort_images.py`.
    Then gridded sheets in **engine px** (`COLS=4 PY tools/egrid.py out.png IMG ...`) and map every picture's
    chimneys, lamps, candles, breath and calm areas before writing shots.
 4. **Script from the images.** Every generated image is used; map each passage to its shots and run the unused-image
-   check (example: `examples/chadwick/tools/script_check.py`). **No length cap**: tell the story fully and
+   check (example: `examples/chadwick/tools/script_check.py`), then `PY tools/story_check.py` (spoken
+   dates, scene-shift openings, where the `[DRIVE]` passage falls, every batch seam) and the checks in
+   `references/storytelling.md` (retell, 15%, but/therefore, no stacked explainers, 5–7 spoken dates, show → draw). **No length cap**: tell the story fully and
    unhurried (~150 words a minute; Chadwick: 1,780 words → 12 min). End with the user's like/follow line.
 5. **Voice**: Gemini (`voice.py --test` first, then batches; `--pace` and `SPEEDS` so every batch sits at ~140–160
-   wpm) or the user's audio (`import_voice.py --full | --passages | --batches`). Set `BATCHES` (natural breaks, 4–7
-   passages, ~65–100 s each) and `GAPS`. Print each batch's words before writing its shots (Whisper mishears names
+   wpm) or the user's audio (`import_voice.py --full | --passages | --batches`). Set `BATCHES` (4–7 passages, ~65–100 s
+   each, cut mid-act where the story is moving; only 2–3 cuts on act breaks; nothing re-introduced at a batch start) and `GAPS`. Print each batch's words before writing its shots (Whisper mishears names
    and writes numbers as digits: cue on what it wrote).
 6. **Music**: 5–7 cues (`music.py`, or the user's files in `audio/music/`); map cues to batches in `final.py`'s `MUSIC`.
 7. **Shot lists** per batch with `seq.py` (`references/engine.md`, `examples/chadwick/tools/`): a film module
@@ -89,15 +102,22 @@ are in `.env` (project first, then REPO): `GEMINI_API_KEY`, `YTF_CHANNEL`, voice
    `shots_bN.py` is ~60 lines of `S.at(time, scene(...)/page(...)/drawin(...)/map_shot(...))`. Check each with
    `PY tools/stills.py bN` and **look at the sheet** before anything renders.
 8. **Renders** (with the user's OK): `PY tools/render_all.py` runs all batches in parallel, as many at once as the
-   machine takes; after fixes, `render_all.py b3 b7` or `--changed`. Test a new transition or effect on two frames
+   machine's free memory takes (about 1.5 GB per render; more at once is slower once memory runs out); after fixes,
+   `render_all.py b3 b7` or `--changed`. Launch it in its own window so closing Claude doesn't stop it, and follow
+   `references/performance.md` when a render is slow or the computer lags (Windows especially). Test a new transition or effect on two frames
    first (a late crash wastes the render).
 9. **Ending** once per channel (`references/cta.md`), then **final join** `PY tools/final.py`; check length, fps,
    loudness on the MP4 (−14 LUFS, peak ≤ −1.5 dB) and sample stills (`references/final-render.md`).
 10. **Dubs** (`references/dubs.md`) and **thumbnails** (`references/thumbnails.md`) if wanted.
 
-## The look (the suggested default; the user may choose another)
-- **Egg-headed people** (egg head, two dark oval eyes, one-line mouth, no nose/ears/brows, simple rounded hands)
-  dressed and lit as part of an **era-accurate real world**; ink line + matte pastel gouache. Backgrounds carry the story.
+## The look (the example's default; every channel picks its own)
+- The example: **egg-headed people** (egg head, two dark oval eyes, one-line mouth, no nose/ears/brows, simple
+  rounded hands) in an **era-accurate real world**; ink line + matte pastel gouache; engine look `gouache`. Other
+  channels choose their own image style, characters (or none) and engine look (`references/art-styles.md`); the
+  rules below hold for every style.
+- **The engine look sets the added layers**: grade, grain, vignette, ink, tag paper, accent, fonts, drawing sound
+  (`engine/look.py`: `YTF_LOOK`, `look.json`). Never hard-code a colour or font in a shots file when the look has
+  one (`look.rgb("accent")`, `look.L.type_font`); a channel's look must change in one place.
 - **No 2.5D, no cutouts, no AI video.** Single images with eased camera moves (push-ins, pans, slow drift).
 - **Never hold one picture too long**: cut to the next shot of the moment (W→M→F→D→P) or to a drawn page.
 - **Sketch explainers are real drawings**, not icons: lifted from the sheets' line art or drawn by the engine where
@@ -105,7 +125,8 @@ are in `.env` (project first, then REPO): `GEMINI_API_KEY`, `YTF_CHANNEL`, voice
 - **Blank bases get drawn on live in their own medium**: graphite on paper, chalk on a board, brush ink, halftone
   photos printing into a newspaper, ink routes on a map.
 - **Lines carry meaning**: tally marks for years, sound rings, falling-paper paths, smoke lines, crossed-out figures.
-- **Labels** (dates, places, names) are **level typewriter** text, typed one key at a time with a soft click.
+- **Labels** (dates, places, names) are **level typed** text in the look's type font (typewriter in `gouache`),
+  typed one key at a time with a soft click.
 - **Writing on an object** sits **on that object's real lines** at their angle; illegible printing under it is
   wiped first (`fx2.clean_text`).
 - **Contrast always**: nothing dark on dark. Labels auto-pick cream/ink with a halo. Never force `color="ink"`
@@ -152,6 +173,28 @@ are in `.env` (project first, then REPO): `GEMINI_API_KEY`, `YTF_CHANNEL`, voice
 - **Invent new effects per film** from what's in its images (every chimney, lamp, candle, breath, document, safe,
   crowd) and add them to fx2.
 
+## Three ways to illustrate: use all three in every film
+Films are rich in illustration when the sketch sheets themselves come on screen and are drawn and
+painted live, blank pages fill with drawings, and the scenes are marked on directly. Every film mixes all three; no single mode carries a whole batch.
+1. **On the picture** (`scene(marks=...)`, `drawin`, `scene(draws=[Scrap, Draw])`): arrows, circles, underlines,
+   ticks, crosses, motion and sound lines, leader labels, level handwritten notes and typed numbers drawn straight
+   on the scene (`Marks`, `sg.underline/cross/tick/motion/sound/leader/route/tally`); a scene with a `_lines`
+   version drawing itself in; and **pin mode**: one sheet drawing pinned on a scrap over the scene, for a single
+   object or person the scene doesn't show. Vary the marks (never a red circle every time).
+2. **The sketchbook sheet** (`sketchbook(sheet, cues, captions=, circles=, marks=)`): the sheet itself on screen,
+   each drawing inking in from its line version, then washed with its own colour, a level handwritten caption under
+   it, a circle on what matters, the camera visiting each drawing and pulling back to the page. For explainers and
+   runs of moments (the bond, the envelopes, the banks, the money). Show the sheet; don't cut its drawings out.
+3. **The blank page** (`blank(draw, base=None, medium="graphite")`): blank sketchbook paper made in code (or a story
+   object from the guide: notebook, blackboard, map) drawn on live in its medium: sheet drawings redrawn stroke by
+   stroke (`page.lift(sheet, panel, centre, height, a, b)`), arrows between them, timelines, routes, words
+   (`page.stroke / strokes / text`).
+- **Words sit level.** Free handwriting and labels are level (`angle=0`); words that belong on a line of the
+  picture (a notebook rule, a printed row) use `Marks.write(a, b)`, which follows that line. `b.check()` flags
+  handwriting more than 4 degrees off level (`flow.MAX_SLANT`).
+- **Reference reel:** `examples/illustration_reel/` (shots file and video): all ten forms on one film's images, each
+  labelled with the call that makes it.
+
 ## The v2 way (Nov 2026): camera with a purpose, depth, light, tags, pauses
 From a full review of Carnegie's Daughter: the camera barely moved, face close-ups were flat discs, labels were hard
 to read, insets floated in glowing ovals, explainer cards were mostly empty, and the mix never went quiet. A 72-second
@@ -165,9 +208,12 @@ painted pixels and there is no 2.5D.
   start on what the narrator is talking about and travel to what he names next; pull back to reveal ("every chair is
   empty"), push on a word ("realized"), snap out on a punchline ("beautifully"). **Never cut between two views of the
   same picture: make it one move.** A plain slow push-in is the last resort, not the default.
-- **Pull the focus** (`focus=`): a point or keys `[(t, point, amount)]`. The focus goes to whoever the sentence is
-  about (her, then him as he listens; the ladies, then through the glass to her house). Mid-pull frames are soft: keep
-  a pull under ~1 s.
+- **Focus softens the setting, never a character** (`focus=`: a point or keys `[(t, point, amount)]`). `fx3.Focus`
+  keeps every detected person sharp (`fx3.people`: each head and the body under it), clamps the softness to
+  `MAX_SOFT = 0.55` and defaults to 0.45. Use it sparingly: a background through a window, a crowd behind the
+  speaker, a room behind a close-up; **a third of the scenes at most** (a film that used it on 105 scenes looked
+  blurry), none on maps, pages, cards or details. To move attention between two people, move the camera. Faces the
+  skin test misses (backs of heads, deep shadow, tiny crowds) can still go soft: check the stills sheet.
 - **Weather lives in the scene**: with a depth map, snow and rain from LIVE fall behind whatever is nearer.
   `snow_z=(0, 0.12)` keeps snow outside a window in an interior. `haze=(amount, colour)` puts mist in the distance.
 - **Faces get form** (`light=(x, y)` of the lamp or window): soft shading on the egg faces and hands, so a close-up
@@ -175,8 +221,8 @@ painted pixels and there is no 2.5D.
 - **Labels are paper tags** (`label=` on scene/drawin, or `tag(b, text, t0, t1)`): typed, in a fixed corner of the
   screen (default bottom left), so a push-in can never crop them. A name that should outlive a cut goes up with
   `b.overlay(tag(...), t0, t1)`. `typed_label=True` gives the old on-picture label.
-- **Insets sit on a pinned scrap**: `draws=[Scrap(at, (w, h), t), Draw(...)]`, never a glowing oval (`card=True` is
-  retired for scenes).
+- **Insets sit on a pinned scrap** (pin mode, one of the three ways to illustrate below): `draws=[Scrap(at, (w, h),
+  t), Draw(...)]`, never a glowing oval (`card=True` is retired for scenes).
 - **Cards fill the frame**: start the camera close on the words being typed (`page(..., cam=...)`), make them large,
   then pull back to the new line. No near-empty card, no dead frames while the pen starts.
 - **Pauses** (`BEATS` in voice.py): `{"P19": [("He believed", 0.6)]}` adds a beat before a reveal, a punchline or a
@@ -190,6 +236,14 @@ painted pixels and there is no 2.5D.
 
 ## Pacing and readability (the picture never runs ahead of the voice)
 Enforced by `b.check()` (runs in stills.py and before every render, and **stops** a render on word problems):
+- **Show, then draw**: a painted
+  picture shows the moment for 3–5 s, then something is drawn while the narrator explains (a sketch inks itself,
+  numbers type, an arrow travels, a page fills, a lift moves) or the film cuts. `b.check()` flags any picture with
+  more than `flow.HOLD_BARE = 6` s with nothing new drawn; camera moves and living layers don't count. A deliberate
+  silent hold is allowed by name: `b.long_holds = {"S13j_dawn"}`.
+- **No fade to black between batches**:
+  a batch ends on a moving shot and the next starts on a straight cut, continuing the sentence before. Fades only at
+  the film's 2–3 act breaks: `b.act_break = True` in that batch's shots file (`b.check()` flags the others).
 - Every word on screen stays readable: typed labels, leaders and handwriting finish ≥ 1.5 s before the cut and sit
   ≥ 90% inside the camera's view. Type labels early; put them in the area the camera keeps (`kit.view_box(keys)`).
 - No shot under 1.2 s unless it's a deliberate montage. No more than ~6 s on one picture unless something new
@@ -242,12 +296,15 @@ of each technique), `video/chadwick_effects_test.mp4`.
 - `references/image-generation.md` — ChatGPT, Codex, Google Flow/Whisk, Gemini API (`imagegen.py`), Midjourney and
   others; saving and naming (`sort_images.py`); checking.
 - `references/consistency.md` — style card, cast sheets, EDITs, places, drift fixes.
-- `references/art-styles.md` — the suggested look and how to use another.
+- `references/art-styles.md` — image styles, the engine looks (`YTF_LOOK`, `look.json`), openers, characters,
+  testing a new style, making the channel unmistakably the user's.
+- `references/formats.md` — the formats beyond documentaries: spine, hook, image mix and features for each.
 - `references/voice.md` — Gemini TTS, importing your own voice, Whisper.
 - `references/music.md`, `references/dubs.md`, `references/thumbnails.md`, `references/cta.md`.
 - `references/engine.md` — film.py / seq.py / fx2.py / kit.py API with examples, batch anatomy.
 - `references/final-render.md` — stills, previews, parallel renders, the final join, checks.
 - `references/performance.md` — slow PCs, Windows speedups, disk and memory.
+- `references/storytelling.md` — the spine, getting to the drive fast, backstory budget, so/but links, the checks.
 - `references/troubleshooting.md`, `references/checklist.md`, `references/story-finding.md`, `references/hooks.md`.
 
 ## Scripts

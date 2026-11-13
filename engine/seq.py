@@ -121,7 +121,7 @@ def scene(img, move="in", zoom=None, act=None, label=None, corner="bl", draws=()
                 src.append(Snow(img, e[1], z=snow_z or (0.05, 1.0), seed=int(t0 * 7) % 97) if e[0] == "snow" else Rain(img, e[1]))
         src += list(extra)
         if focus is not None and deep:
-            fk = focus if isinstance(focus, list) else [(t0, focus, 0.7)]
+            fk = focus if isinstance(focus, list) else [(t0, focus, 0.45)]
             src.append(Focus(img, fk))
         src += list(draws)
         if label:
@@ -167,6 +167,81 @@ def page(base, items=(), marks=None, zoom=None, post=(), fx=(), trans=("dissolve
         k = _cam(cam, None, t0, t1, None) if cam is not None else (
             [(t0, *zoom[0]), (t1, *zoom[1])] if zoom else [(t0, 887, 443, 887), (t1, 887, 443, 850)])
         b.custom(t0, Live(base, list(items)), k, base, marks=marks, post=list(post), fx=list(fx), trans=trans)
+    return run
+
+
+# ---------------------------------------------------------------- the three ways to illustrate (Scream + Grant, Nov 2026)
+# 1. ON THE PICTURE: marks drawn straight on a scene (arrows, circles, handwritten notes, motion lines), a scene that
+#    draws itself (drawin), a drawing pinned on a scrap (scene(draws=[Scrap(...), Draw(...)])) for one small object.
+# 2. THE SKETCHBOOK SHEET (sketchbook): the sketch sheet itself on screen, each drawing inking in from its line
+#    version and then washed with its own colour, a level handwritten caption under it, a red circle on what matters;
+#    the camera visits each drawing and pulls back to the page. For explainers and runs of moments (the Scream way).
+# 3. THE BLANK PAGE (blank): a blank page, the sketchbook paper or a story object (notebook, board, map), drawn on
+#    live in its medium: sheet drawings redrawn in stroke order (lift), maps, routes, timelines, words.
+# Mix all three in every film; never let one carry a whole batch.
+
+def sketchbook(sheet, cues, captions=None, circles=None, marks=None, ink=1.4, colour=0.9, done=(), cap_size=46,
+               cap_color="red", **kw):
+    """The sketch sheet itself, drawn live (references/engine.md, "three ways to illustrate").
+    cues = [(panel, dt), ...] in drawing order, dt = seconds after the shot starts.
+    captions = {panel: "words"}: a level handwritten caption under that drawing, written as it finishes inking.
+    circles = {panel: (fx, fy, frx, fry)}: a circle around part of the drawing, as fractions of its box, drawn
+    after its colour. marks = extra Marks (arrows between drawings, crosses). done = panels already drawn."""
+    def run(b, t0, t1):
+        m = marks if marks is not None else Marks()
+        P = film.panels(sheet)
+        abs_cues = [(p, t0 + dt) for p, dt in cues]
+        for i, (p, tc) in enumerate(abs_cues):
+            x0, y0, x1, y1 = P[p]
+            nxt = abs_cues[i + 1][1] if i + 1 < len(abs_cues) else t1
+            d = max(0.6, min(ink, (nxt - tc) * 0.65))
+            if captions and p in captions:
+                txt = captions[p]
+                w = cap_size * 0.5 * len(txt)
+                m.text(txt, (max(10, (x0 + x1) / 2 - w / 2), min(film.SH - cap_size, y1 + cap_size * 0.9)), cap_size,
+                       tc + d * 0.7, min(0.9, 0.12 + 0.05 * len(txt)), color=cap_color, angle=0)
+            if circles and p in circles:
+                fx_, fy_, rx_, ry_ = circles[p]
+                m.circle((x0 + fx_ * (x1 - x0), y0 + fy_ * (y1 - y0)), rx_ * (x1 - x0), ry_ * (y1 - y0),
+                         tc + d + min(colour, 0.8), 0.5, color="red")
+        kit.sheet(b, sheet, t0, t1, abs_cues, marks=m, ink=ink, colour=colour, done=done, **kw)
+    return run
+
+
+PAPER = "PAPER_sketchbook"
+
+
+def paper_base(name=PAPER, tint=(250, 247, 240), seed=3):
+    """A blank sketchbook page made in code (build/edit/<name>.png, source size), for drawings on blank paper when
+    the film has no base of its own. Soft paper tooth, faint fibres, a slightly lighter centre."""
+    out = film.BUILD / "edit" / f"{name}.png"
+    if not out.exists():
+        import cv2
+        from PIL import Image
+        out.parent.mkdir(parents=True, exist_ok=True)
+        r = np.random.default_rng(seed)
+        a = np.empty((film.SH, film.SW, 3), np.float32)
+        a[:] = tint
+        tooth = cv2.GaussianBlur(r.standard_normal((film.SH, film.SW)).astype(np.float32), (0, 0), 0.8) * 3.0
+        fib = cv2.GaussianBlur(r.standard_normal((film.SH, film.SW)).astype(np.float32), (0, 0), 18) * 6.0
+        yy, xx = np.mgrid[0:film.SH, 0:film.SW].astype(np.float32)
+        vig = np.hypot((xx - film.SW / 2) / film.SW, (yy - film.SH / 2) / film.SH) * 14
+        a += (tooth + fib - vig)[..., None]
+        Image.fromarray(np.clip(a, 0, 255).astype(np.uint8)).save(out)
+    return name
+
+
+def blank(draw, base=None, medium="graphite", cam=None, marks=None, post=(), fx=(), trans=("dissolve", 0.3), drift=0.4):
+    """A blank page drawn on live. draw(page, t0, t1) adds the drawings to a film.Page: page.lift(sheet, panel,
+    center, height, a, b) redraws a sketch-sheet drawing (or a box of a scene's _lines) in stroke order;
+    page.stroke / strokes / text for routes, timelines, words. base = a blank story object from the guide
+    (notebook, blackboard, map), or None for the code-made sketchbook paper. medium = graphite | chalk | sumi |
+    carve (film.MEDIA). cam = keys or a function (t0, t1) -> keys, in the base's source px."""
+    def run(b, t0, t1):
+        pg = film.Page(base or paper_base(), medium)
+        draw(pg, t0, t1)
+        k = _cam(cam, None, t0, t1, None) if cam is not None else [(t0, 887, 443, 887), (t1, 887, 443, 860)]
+        b.page(t0, pg, k, marks=marks, post=list(post), fx=list(fx), trans=trans, drift=drift)
     return run
 
 

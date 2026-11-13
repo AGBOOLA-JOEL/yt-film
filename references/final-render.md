@@ -24,7 +24,10 @@ python tools/render_all.py --cta           # also the ending
 ```
 Each batch: `renders/bN.mp4` (1920x1080, 24 fps, x264), `renders/bN_fx.npy` (its effects stem for the final mix),
 log in `renders/bN.log`. Renders run at low priority so the computer stays usable. Never render batches one after
-another by hand: the runner keeps the right number going. Speed advice: performance.md.
+another by hand, and never start more than the runner picks: it counts free memory, and too many at once makes
+every render crawl and freezes the computer. Start full renders in their own window so they survive closing Claude;
+if the computer lags or the log lines slow to minutes apart, follow performance.md (pause, or stop and
+`--changed --jobs 2`; finished batches are kept).
 
 ## 4. The final join
 ```bash

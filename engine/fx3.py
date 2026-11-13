@@ -3,7 +3,7 @@ Carnegie's Daughter batch 4). Like fx2, everything here ADDS a layer or re-light
 there is no 2.5D.
 
   depth maps   tools/depth.py makes build/depth/<image>.png (near = bright) for every scene picture, once per film
-  Focus        depth of field with a keyed focal plane: the focus pulls from one person to another
+  Focus        depth of field with a keyed focal plane that softens the setting; characters always stay sharp
   Snow / Rain  weather that lives in the scene: each flake has a depth and is hidden by anything nearer than it
                (snow behind a figure; z=(0, 0.12) keeps it outside a window)
   Haze         far parts of the picture lifted towards a mist colour
@@ -22,6 +22,7 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
 import film
+import look
 from film import UP, SW, SH, ease, up
 from fx2 import _blend, _sm
 
@@ -65,22 +66,78 @@ def _key(keys, t):
     return keys[-1][1:]
 
 
-class Focus:
-    """Depth of field. keys = [(t, focus, amount)]: focus is a depth (0-1) or a point (x, y) in source px whose
-    depth is used; amount 0-1 is how soft the out-of-focus parts get. blur = the largest blur, in source px."""
+# ---------------------------------------------------------------- people: who must never go soft
+_HEADS, _PEOPLE = {}, {}
 
-    def __init__(self, img, keys, blur=4.5, span=0.30):
+
+def heads(img, min_area=150):
+    """The egg heads (and big hands) in the picture: [(x, y, w, h), ...] in source px. Same skin test as FaceLight,
+    but it also keeps small crowd faces."""
+    if img not in _HEADS:
+        a = cv2.resize(up(img), (SW, SH), interpolation=cv2.INTER_AREA)
+        hsv = cv2.cvtColor(a, cv2.COLOR_RGB2HSV)
+        h, s, v = hsv[..., 0], hsv[..., 1], hsv[..., 2]
+        skin = ((h >= 6) & (h <= 21) & (s >= 55) & (s <= 160) & (v >= 140)).astype(np.uint8)
+        skin = cv2.morphologyEx(skin, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
+        n, lab, st, _ = cv2.connectedComponentsWithStats(skin)
+        out = []
+        for i in range(1, n):
+            x, y, w, hh, A = st[i]
+            if A < min_area or not 0.45 <= w / max(1, hh) <= 1.8:
+                continue
+            cnts, _ = cv2.findContours((lab[y:y + hh, x:x + w] == i).astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            c = max(cnts, key=cv2.contourArea)
+            if cv2.contourArea(c) / max(1.0, cv2.contourArea(cv2.convexHull(c))) >= 0.72:
+                out.append((int(x), int(y), int(w), int(hh)))
+        _HEADS[img] = out
+    return _HEADS[img]
+
+
+def people(img):
+    """1 where a character is (source size, feathered): each head, and the body under it (a box ~2.6 heads wide and
+    ~5.5 heads deep, keeping only what is not further away than the head, so the room behind can still go soft).
+    Focus never softens these (Grant film, Nov 2026: pulls between two people left one of them blurred)."""
+    if img not in _PEOPLE:
+        d = depth(img) if has_depth(img) else None
+        m = np.zeros((SH, SW), np.float32)
+        for x, y, w, h in heads(img):
+            hx0, hy0, hx1, hy1 = max(0, int(x - .35 * w)), max(0, int(y - .35 * h)), min(SW, int(x + 1.35 * w)), min(SH, int(y + 1.35 * h))
+            m[hy0:hy1, hx0:hx1] = 1
+            bx0, bx1, by0, by1 = max(0, int(x - .8 * w)), min(SW, int(x + 1.8 * w)), y, min(SH, int(y + 5.5 * h))
+            if bx1 <= bx0 or by1 <= by0:
+                continue
+            body = np.ones((by1 - by0, bx1 - bx0), np.float32)
+            if d is not None:
+                hd = float(np.median(d[y:y + h, x:x + w]))
+                body = (d[by0:by1, bx0:bx1] >= hd - 0.12).astype(np.float32)
+            m[by0:by1, bx0:bx1] = np.maximum(m[by0:by1, bx0:bx1], body)
+        m = cv2.dilate(m, np.ones((7, 7), np.uint8))
+        _PEOPLE[img] = np.clip(cv2.GaussianBlur(m, (0, 0), 5) * 1.6, 0, 1)
+    return _PEOPLE[img]
+
+
+MAX_SOFT = 0.55  # the most any focus may soften (amount is clamped to this)
+
+
+class Focus:
+    """Depth of field that softens the SETTING, never a character. keys = [(t, focus, amount)]: focus is a depth
+    (0-1) or a point (x, y) in source px whose depth is used; amount 0-1 (clamped to MAX_SOFT) is how soft the
+    out-of-focus parts get. blur = the largest blur, in source px. Every detected person stays sharp whatever the
+    focus does (fx3.people); keep=False turns that off for a shot with no characters that needs it."""
+
+    def __init__(self, img, keys, blur=3.2, span=0.30, keep=True):
         self.d = depth(img)
-        self.keys = [(t, depth_at(img, f) if isinstance(f, (tuple, list)) else float(f), float(a)) for t, f, a in keys]
+        self.keys = [(t, depth_at(img, f) if isinstance(f, (tuple, list)) else float(f), min(MAX_SOFT, float(a))) for t, f, a in keys]
         self.blur, self.span = blur, span
         self.dh = cv2.resize(self.d, (SW, SH))  # the blurred copies are made at source size (half the 2x working size)
+        self.keep = (1 - people(img)) if keep else 1.0
 
     def __call__(self, a, t):
         f, amt = _key(self.keys, t)
         if amt <= 0.01:
             return a
         a = a if a.dtype == np.float32 else a.astype(np.float32)
-        coc = np.clip((np.abs(self.dh - f) - self.span * 0.35) / self.span, 0, 1) * amt
+        coc = np.clip((np.abs(self.dh - f) - self.span * 0.35) / self.span, 0, 1) * amt * self.keep
         small = cv2.resize(a, (SW, SH), interpolation=cv2.INTER_AREA)
         b1 = cv2.GaussianBlur(small, (0, 0), self.blur * 0.45)
         b2 = cv2.GaussianBlur(small, (0, 0), self.blur)
@@ -233,7 +290,7 @@ class Scrap:
         al = cv2.warpAffine(al, M, (w + 2 * P, h + 2 * P))
         self.al = cv2.GaussianBlur(al, (0, 0), 0.8)
         rgb = np.empty((h + 2 * P, w + 2 * P, 3), np.float32)
-        rgb[:] = (243, 234, 213)
+        rgb[:] = look.rgb("paper")
         tex = cv2.GaussianBlur(r.standard_normal((h + 2 * P, w + 2 * P)).astype(np.float32), (0, 0), 2.5) * 5
         fib = cv2.GaussianBlur(r.standard_normal((h + 2 * P, w + 2 * P)).astype(np.float32), (0, 0), 14) * 9
         rgb += (tex + fib)[..., None]
@@ -297,13 +354,14 @@ class Tag:
                     al[y, :j[y]] = 0
         self.al = cv2.GaussianBlur(al, (0, 0), 0.7)
         paper = np.empty((h, w, 3), np.float32)
-        paper[:] = (242, 233, 210)
+        paper[:] = look.rgb("paper")
         paper += cv2.GaussianBlur(r.standard_normal((h, w)).astype(np.float32), (0, 0), 2)[..., None] * 5
-        paper[int(3 * K):int(3 * K) + max(1, int(2 * K)), :] *= 0.93  # a ruled edge, top and bottom
-        paper[h - int(3 * K) - max(1, int(2 * K)):h - int(3 * K), :] *= 0.93
+        if look.L.ruled_tags:
+            paper[int(3 * K):int(3 * K) + max(1, int(2 * K)), :] *= 0.93  # a ruled edge, top and bottom
+            paper[h - int(3 * K) - max(1, int(2 * K)):h - int(3 * K), :] *= 0.93
         self.paper = paper
         self.sh = cv2.GaussianBlur(np.pad(self.al, 16), (0, 0), 6) * 0.38
-        self.ink = np.array([34, 28, 24], np.float32)
+        self.ink = np.array(look.on_paper(), np.float32)
         self.t0, self.t1, self.pos, self.anchor, self.cps, self.n = t0, t1, pos, anchor, cps, len(text)
         self.type_t = (t0 + 0.3, t0 + 0.3 + len(text) / cps)
         self.w, self.h, self.align = w, h, align
