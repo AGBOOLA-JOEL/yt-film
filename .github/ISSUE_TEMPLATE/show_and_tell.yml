@@ -1,0 +1,11 @@
+name: Show and tell
+description: Share a film, a style, a look.json or a trick you made with yt-film.
+labels: [show-and-tell]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What you made
+      description: A link or a few stills, the look and format you used, and anything you changed.
+    validations:
+      required: true

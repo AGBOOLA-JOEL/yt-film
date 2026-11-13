@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security problem
+    url: https://github.com/AGBOOLA-JOEL/yt-film/security/advisories/new
+    about: Report security issues privately, not in a public issue.
+  - name: Guides
+    url: https://github.com/AGBOOLA-JOEL/yt-film/tree/main/references
+    about: Install, styles, formats, rendering, troubleshooting.

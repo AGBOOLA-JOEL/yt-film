@@ -61,6 +61,7 @@ narration, a voice mastering chain, and a score that rises in the pauses.
 9. [The Chadwick example](#the-chadwick-example)
 10. [Repo map](#repo-map)
 11. [Troubleshooting](#troubleshooting)
+12. [Licence and contributing](#licence-and-contributing)
 
 ---
 
@@ -81,7 +82,7 @@ narration, a voice mastering chain, and a score that rises in the pauses.
 > Install the yt-film skill from https://github.com/AGBOOLA-JOEL/yt-film and set it up on this computer.
 
 Claude clones it into `~/.claude/skills/yt-film`, runs the right setup script, checks everything with the doctor
-and fixes what's missing. (It's a private repo: run `gh auth login` first, or be added as a collaborator.)
+and fixes what's missing.
 
 **By hand, macOS** (needs [Homebrew](https://brew.sh)):
 ```bash
@@ -312,5 +313,15 @@ images, cues Whisper misheard, memory, rate limits): [`references/troubleshootin
 
 Real archive photos in the example are public domain (Wikimedia Commons / Library of Congress, credited in
 `examples/chadwick/incoming/05_photos/CREDITS.md`). Fonts downloaded by the setup are under the SIL Open Font Licence
-or Apache 2.0. Natural Earth data is public domain. Private repository: all other content © the owner, not for
-redistribution.
+or Apache 2.0. Natural Earth data is public domain.
+
+## Licence and contributing
+
+yt-film is **source-available**, not open source: you can install it and use it to make and publish your own videos,
+personal or commercial, and the videos are yours. Redistributing or republishing the code (or a modified version)
+needs written permission. Full terms: [LICENSE](LICENSE).
+
+Issues, ideas, questions and show-and-tell posts are welcome: open an issue (forms for bugs, features, questions and
+sharing your films). Pull requests are open to invited collaborators only; if you've fixed something in your own
+copy, describe it in an issue and a collaborator will bring it in. See [CONTRIBUTING.md](CONTRIBUTING.md),
+[SECURITY.md](SECURITY.md) (report problems privately) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).

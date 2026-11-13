@@ -1,0 +1,11 @@
+name: Question
+description: How do I...?
+labels: [question]
+body:
+  - type: textarea
+    id: q
+    attributes:
+      label: Your question
+      description: What you're trying to do and what you've tried (the guides in references/ cover most things).
+    validations:
+      required: true

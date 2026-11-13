@@ -170,12 +170,12 @@ def page(base, items=(), marks=None, zoom=None, post=(), fx=(), trans=("dissolve
     return run
 
 
-# ---------------------------------------------------------------- the three ways to illustrate (Scream + Grant, Nov 2026)
+# ---------------------------------------------------------------- the three ways to illustrate
 # 1. ON THE PICTURE: marks drawn straight on a scene (arrows, circles, handwritten notes, motion lines), a scene that
 #    draws itself (drawin), a drawing pinned on a scrap (scene(draws=[Scrap(...), Draw(...)])) for one small object.
 # 2. THE SKETCHBOOK SHEET (sketchbook): the sketch sheet itself on screen, each drawing inking in from its line
 #    version and then washed with its own colour, a level handwritten caption under it, a red circle on what matters;
-#    the camera visits each drawing and pulls back to the page. For explainers and runs of moments (the Scream way).
+#    the camera visits each drawing and pulls back to the page. For explainers and runs of moments.
 # 3. THE BLANK PAGE (blank): a blank page, the sketchbook paper or a story object (notebook, board, map), drawn on
 #    live in its medium: sheet drawings redrawn in stroke order (lift), maps, routes, timelines, words.
 # Mix all three in every film; never let one carry a whole batch.

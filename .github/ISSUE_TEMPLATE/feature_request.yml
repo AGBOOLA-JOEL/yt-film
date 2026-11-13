@@ -1,0 +1,23 @@
+name: Feature or idea
+description: A new effect, look, format, guide or improvement.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: The idea
+      description: What you'd like the engine or the skill to do, and the kind of video it's for.
+    validations:
+      required: true
+  - type: textarea
+    id: example
+    attributes:
+      label: An example (optional)
+      description: A link, a sketch, a still, or a few lines of code from your own copy.
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Contribution terms
+      options:
+        - label: I agree that ideas or code I post here may be used in yt-film (LICENSE, section 5).
+          required: true

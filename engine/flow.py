@@ -100,7 +100,7 @@ def seam_fades(b, shots):
     return out
 
 
-MAX_SLANT = 4.0  # degrees: free handwriting and labels sit level (Scream fixed this; words on a tilted object use Marks.write)
+MAX_SLANT = 4.0  # degrees: free handwriting and labels sit level (words on a tilted object use Marks.write)
 
 
 def slanted(b, shots, limit=MAX_SLANT):
