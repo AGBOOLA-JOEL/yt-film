@@ -10,17 +10,44 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-vid, out = sys.argv[1], sys.argv[2]
-ts = [float(x) for x in sys.argv[3:]]
-ims = []
-with tempfile.TemporaryDirectory() as d:
-    f = str(Path(d) / "f.png")
-    for t in ts:
-        subprocess.run(["ffmpeg", "-y", "-v", "error", "-ss", str(t), "-i", vid, "-frames:v", "1", f], check=True)
-        a = cv2.imread(f)
-        cv2.putText(a, str(t), (10, 40), 0, 1.2, (0, 255, 255), 3)
-        ims.append(cv2.resize(a, (640, 360)))
-while len(ims) % 2:
-    ims.append(np.zeros_like(ims[0]))
-cv2.imwrite(out, np.vstack([np.hstack(ims[i:i + 2]) for i in range(0, len(ims), 2)]))
-print("wrote", out)
+def thumbnail(frame, timestamp):
+    height, width = frame.shape[:2]
+    box_width, box_height = (360, 640) if height > width else (640, 360)
+    scale = min(box_width / width, box_height / height)
+    size = (max(1, round(width * scale)), max(1, round(height * scale)))
+    image = cv2.resize(frame, size, interpolation=cv2.INTER_AREA if scale < 1 else cv2.INTER_LINEAR)
+    tile = np.zeros((box_height, box_width, 3), dtype=np.uint8)
+    x, y = (box_width - size[0]) // 2, (box_height - size[1]) // 2
+    tile[y:y + size[1], x:x + size[0]] = image
+    cv2.putText(tile, f"{timestamp:g}s", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
+    return tile
+
+
+def main():
+    if len(sys.argv) < 4:
+        raise SystemExit("usage: video_stills.py VIDEO OUTPUT TIME [TIME ...]")
+    video, output = sys.argv[1:3]
+    timestamps = [float(value) for value in sys.argv[3:]]
+    images = []
+    with tempfile.TemporaryDirectory() as directory:
+        path = Path(directory) / "frame.png"
+        for timestamp in timestamps:
+            path.unlink(missing_ok=True)
+            subprocess.run(["ffmpeg", "-y", "-v", "error", "-ss", str(timestamp), "-i", video,
+                            "-frames:v", "1", str(path)], check=True)
+            if not path.is_file():
+                raise SystemExit(f"no frame at {timestamp:g}s")
+            frame = cv2.imread(str(path))
+            if frame is None:
+                raise SystemExit(f"could not read the frame at {timestamp:g}s")
+            images.append(thumbnail(frame, timestamp))
+    if len(images) % 2:
+        images.append(np.zeros_like(images[0]))
+    sheet = np.vstack([np.hstack(images[i:i + 2]) for i in range(0, len(images), 2)])
+    if not cv2.imwrite(output, sheet):
+        raise SystemExit(f"could not write {output}")
+    print("wrote", output)
+
+
+if __name__ == "__main__":
+    main()

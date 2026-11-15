@@ -1,0 +1,50 @@
+{
+  "name": "Caricature Stylesheet",
+  "example": "Caesar and the Pirates",
+  "canvas": { "width": 1080, "height": 1920, "fps": 24 },
+  "palette": {
+    "cream": "#FAEED4",
+    "gold": "#FBC664",
+    "ink": "#27211C",
+    "rust": "#A43F36",
+    "matte_teal": "#1B2A2C",
+    "popup_paper": "#F7E1B4",
+    "number_card": "#EBD8AD",
+    "map_water": "#9EB7AD",
+    "map_land": "#E1D3B0",
+    "caption_stroke": "#1A1816",
+    "caption_shadow": "#121110"
+  },
+  "fonts": {
+    "display": "Anton Regular",
+    "caption": "Arial Bold",
+    "label": "Courier Prime Bold",
+    "handwritten": "Caveat Regular"
+  },
+  "layout_px": {
+    "headline_origin": [88, 290],
+    "headline_sizes": { "first_opening": 101, "later_openings": 126, "cliffhanger": 112 },
+    "series_label_origin": [85, 214],
+    "series_label_size": 33,
+    "episode_badge": { "origin": [878, 117], "size": [115, 63] },
+    "caption": {
+      "origin": [56, 1415],
+      "box": [920, 205],
+      "max_line_width": 857,
+      "font_size": 62,
+      "fallback_font_size": 53,
+      "stroke_width": 4,
+      "shadow_offset_y": 4,
+      "shadow_stroke_width": 8
+    },
+    "wide_shot_window": { "origin": [52, 461], "size": [987, 790], "border": 6 },
+    "map_window": { "origin": [85, 517], "size": [916, 934] },
+    "popup": { "center": [796, 843], "card": [476, 546], "subject_box": [352, 342] }
+  },
+  "art_references": {
+    "style": "style-card.png",
+    "caesar": "caesar-cast.png",
+    "pirate_captain": "captain-cast.png",
+    "blank_card": "paper-base.png"
+  }
+}

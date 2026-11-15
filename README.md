@@ -9,6 +9,11 @@ with synthesised sound, a ducked score and YouTube-ready loudness.
 
 No After Effects, no AI video, no stock footage, no render farm. It runs on a Mac or a Windows PC.
 
+Choose the [yt-film skill](SKILL.md) for landscape documentaries or [yt-film-reels](skills/yt-film-reels/SKILL.md)
+for vertical social episodes. [Caesar and the Pirates](examples/caesar/README.md) shows the reel workflow in four
+finished parts and includes reusable character pop-up artwork and a demo.
+The [Caricature Stylesheet](styles/caricature/README.md) packages that illustrated look for other stories.
+
 <p align="center">
   <img src="examples/chadwick/look/comic_page.jpg" width="32%">
   <img src="examples/chadwick/look/con_drawn_on_envelope.jpg" width="32%">
