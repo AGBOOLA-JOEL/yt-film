@@ -17,5 +17,6 @@ copy it into that project's `tools/` and run:
 python tools/shots_reel.py --portrait
 ```
 
-Add `--stills out.png` for a contact sheet of twelve frames instead of a render. `grant_reel_proof.mp4` is the
-result (720 x 1280 copy). See [portrait mode](../../references/portrait.md).
+Add `--stills out.png` for a contact sheet of twelve frames instead of a render. There are two renders (720 x 1280 copies):
+`grant_reel_proof.mp4` is the first, and `grant_reel_proof_v2.mp4` is the second, with a tighter close-up on the
+$80 so the drawn circle sits on the coins. See [portrait mode](../../references/portrait.md).
