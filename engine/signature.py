@@ -475,8 +475,8 @@ class Hand:
         M[1, 2] += y + hh / 2 - self.rgb.shape[0] / 2
         rgb = cv2.warpAffine(self.rgb, M, (W, H))
         al = cv2.warpAffine(self.al, M, (W, H))[..., None]
-        sh = cv2.GaussianBlur(cv2.warpAffine(self.al, M + np.float32([[0, 0, 10 * W / 1920], [0, 0, 14 * W / 1920]]), (W, H)),
-                              (0, 0), 12 * W / 1920)[..., None]
+        sh = cv2.GaussianBlur(cv2.warpAffine(self.al, M + np.float32([[0, 0, 10 * film.S], [0, 0, 14 * film.S]]), (W, H)),
+                              (0, 0), 12 * film.S)[..., None]
         img = img * (1 - sh * 0.35)
         return img * (1 - al) + rgb * al
 
@@ -626,7 +626,7 @@ class Rays:
                                         math.sin(math.radians(self.ang + (x - 0.5) * self.spread))]) * ((y + t * 0.02 * (0.5 + z)) % 1)
             if 0 <= p[0] < W and 0 <= p[1] < H:
                 b = m[int(p[1]), int(p[0]), 0]
-                cv2.circle(img, (int(p[0]), int(p[1])), max(1, int(1.5 * z * W / 1920)), tuple(float(v) for v in self.color), -1, cv2.LINE_AA) if b * k > 0.02 else None
+                cv2.circle(img, (int(p[0]), int(p[1])), max(1, int(1.5 * z * film.S)), tuple(float(v) for v in self.color), -1, cv2.LINE_AA) if b * k > 0.02 else None
         return img
 
 

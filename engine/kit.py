@@ -45,9 +45,8 @@ def view_box(keys):
     boxes = []
     for k in keys:
         cx, cy, h = k[1:4] if len(k) >= 4 else k
-        h = min(SH, h)
-        w = h * 16 / 9
-        cx, cy = min(max(cx, w / 2), SW - w / 2), min(max(cy, h / 2), SH - h / 2)
+        cx, cy, h = film.clamp_cam(cx, cy, h)
+        w = h * film.AR
         boxes.append((cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2))
     return (max(b_[0] for b_ in boxes), max(b_[1] for b_ in boxes), min(b_[2] for b_ in boxes), min(b_[3] for b_ in boxes))
 

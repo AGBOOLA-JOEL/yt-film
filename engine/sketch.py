@@ -10,6 +10,7 @@ point, and the pencil/pen/brush sounds are synthesised from the pen's actual spe
 import json
 import math
 import subprocess
+import os
 import sys
 import wave
 from pathlib import Path
@@ -26,7 +27,10 @@ import stages  # noqa: E402
 ROOT = Path(__file__).resolve().parent.parent
 GEO = Path(__file__).resolve().parent / "geo" / "ne_10m_land.geojson"
 PREVIEW = "--preview" in sys.argv
+PORTRAIT = "--portrait" in sys.argv or os.environ.get("YTF_FORMAT", "").lower() == "portrait"
 OW, OH = (960, 540) if PREVIEW else (1920, 1080)
+if PORTRAIT:
+    OW, OH = OH, OW
 FPS = 12 if PREVIEW else 24
 WW, WH = 6600, 2700  # the page, in world px (1.5 world px per output px at the default framing)
 PS = 1.5  # paper texture is stored at world / PS
@@ -400,7 +404,7 @@ def main():
     layers = {k: Image.new("L", (WW, WH)) for k in ("ink", "pencil", "red")}
     draws = {k: ImageDraw.Draw(v) for k, v in layers.items()}
     items = sorted(build_map() + build_annotations(), key=lambda i: i.t0)
-    sc = OW / 1920
+    sc = min(OW, OH) / 1080
     sprites = {k: tool_sprite(k, 0.36 * sc) for k in ("pencil", "pen", "red", "brush")}  # small: the drawing is the point
     # boil: three gentle displacement fields, switched every 3 frames (24 fps) like re-traced animation lines
     gx, gy = np.meshgrid(np.arange(OW, dtype=np.float32), np.arange(OH, dtype=np.float32))

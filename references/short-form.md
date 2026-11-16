@@ -46,7 +46,7 @@ Use gentle stereo placement for off-center actions and check the result on a pho
 
 ## Compose, export and check each part
 
-The bundled `film.py` and `final.py` workflow is landscape. Keep its master and assets available, and build the portrait layout and episode timing in a project-specific compositor or editor. An OpenCV/Pillow compositor can use the existing still sources and FFmpeg can encode and mux each numbered episode. Reuse verified art, dry narration and stems. Save scene/overlay timing and pause trims in the edit plan so a revised voice or effect can be rebuilt without redoing the art.
+The film engine renders portrait directly: run the episode's shot file with `--portrait` and it writes 1080 × 1920 with the whole explainer set (marks on the picture, sheets, pages, counters, weather, transitions) plus captions, badge, headline and pop-ups from `engine/reel.py`. See [portrait mode](portrait.md). Wide pictures are reframed by subject or shown whole in a framed window; tall pictures are kept whole. Each episode is one batch, mixed and levelled by its own render. Reuse verified art, dry narration and stems, and keep cue times in the shot file so a revised voice or effect rebuilds without redoing the art. Go past the base set where the story asks for it: [Claude is the driver](creative.md).
 
 1. Check representative vertical stills and a short section with audio before a long render. Use a reveal, a caption on a busy picture, a pop-up and a map when present. Check every episode opening and ending.
 2. Export a numbered MP4 per episode. If the change was audio only on a locked cut, remux the audio with `-c:v copy`. Recompose affected sections when captions, timing or overlays change.

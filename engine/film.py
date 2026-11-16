@@ -39,7 +39,16 @@ import ytf  # noqa: E402  (portable paths, fonts, settings)
 import look  # noqa: E402  (the film's look: grade, grain, ink, paper, accent, fonts; YTF_LOOK / look.json)
 
 PREVIEW = "--preview" in sys.argv
-OW, OH = (960, 540) if PREVIEW else (1920, 1080)
+# Format: landscape films (1920 x 1080) or portrait reels (1080 x 1920). Portrait is chosen with --portrait on the
+# command line, YTF_FORMAT=portrait in the environment, or a one-line file `format` holding "portrait" in the project.
+PORTRAIT = ("--portrait" in sys.argv or (ytf.setting("YTF_FORMAT") or "").lower() == "portrait"
+            or ((ROOT / "format").exists() and (ROOT / "format").read_text().strip().lower() == "portrait"))
+if PORTRAIT:
+    OW, OH = (540, 960) if PREVIEW else (1080, 1920)
+else:
+    OW, OH = (960, 540) if PREVIEW else (1920, 1080)
+AR = OW / OH  # frame shape: the camera sees h * AR source px across for h source px down
+S = min(OW, OH) / 1080  # screen unit: sizes written for a 1080-px short side (1.0 at full size in both formats)
 FPS = 12 if PREVIEW else 24
 SW, SH = 1774, 887  # source image size
 UP = 2  # working images are upscaled 2x
@@ -100,11 +109,14 @@ def up(name):
     """Source image upscaled 2x (Lanczos + light sharpen, then a touch of blur so camera moves don't shimmer)."""
     if name in _cache:
         return _cache[name]
-    f = BUILD / "up" / f"{name}.png"
+    f = BUILD / ("up_portrait" if PORTRAIT else "up") / f"{name}.png"
     if not f.exists() or f.stat().st_mtime < find_img(name).stat().st_mtime:  # rebuilt when an image is replaced
         f.parent.mkdir(parents=True, exist_ok=True)
         a = cv2.cvtColor(cv2.imread(str(find_img(name))), cv2.COLOR_BGR2RGB)
         h, w = a.shape[:2]
+        if PORTRAIT and w < h:  # a tall image in a reel: kept whole, centred on the canvas (see img_box)
+            a = _tall(a)
+            h, w = a.shape[:2]
         if abs(w / h - SW / SH) > 0.01:  # not 2:1: centre-crop rather than stretch
             if w / h < SW / SH:
                 c = round(w * SH / SW); a = a[(h - c) // 2:(h - c) // 2 + c]
@@ -119,6 +131,43 @@ def up(name):
     if len(_cache) > 8:
         _cache.pop(next(iter(_cache)))
     return a
+
+
+def _tall(a):
+    """A tall (portrait) image set whole on the 2:1 canvas at full height, centred; the sides are filled with a soft,
+    dark, mirrored copy so nothing hard shows if the camera drifts past its edge."""
+    h, w = a.shape[:2]
+    H, W = SH * UP, SW * UP
+    nw = min(W, round(w * H / h))
+    b = cv2.resize(a, (nw, H), interpolation=cv2.INTER_LANCZOS4)
+    fill = cv2.GaussianBlur(cv2.resize(cv2.flip(b, 1), (W, H), interpolation=cv2.INTER_LINEAR), (0, 0), 30)
+    out = (fill.astype(np.float32) * 0.5).astype(np.uint8)
+    x0 = (W - nw) // 2
+    out[:, x0:x0 + nw] = b
+    return out
+
+
+def img_box(name):
+    """Where an image sits on the source canvas, in source px: (x0, y0, x1, y1). Wide images fill the canvas
+    (0, 0, 1774, 887). In portrait format a tall image is kept whole and centred, so a 2:3 picture is
+    (591, 0, 1183, 887) and a 9:16 picture is (637, 0, 1137, 887): give marks and camera keys in these coordinates."""
+    with Image.open(find_img(name)) as im:
+        w, h = im.size
+    if PORTRAIT and w < h:
+        nw = min(SW, w * SH / h)
+        return ((SW - nw) / 2, 0, (SW + nw) / 2, SH)
+    return (0, 0, SW, SH)
+
+
+def full(name=None, cy=None):
+    """Camera (cx, cy, h) showing as much of the picture as the frame allows: the full height in landscape; in
+    portrait the full height of a tall image, or a whole wide image in a window (cy moves the window up or down)."""
+    if PORTRAIT and name is not None:
+        x0, _, x1, _ = img_box(name)
+        if x1 - x0 > SH * AR * 1.05:  # a wide picture: pull back until its whole width shows
+            h = SW / AR
+            return (SW / 2, SH / 2 + h * 0.06 if cy is None else cy, h)
+    return (SW / 2, SH / 2, SH)
 
 
 def ease(u, kind="io"):
@@ -271,7 +320,7 @@ class Snow:
         self.ph = r.uniform(0, 6.28, n)
 
     def draw(self, img, t, amount=1.0):
-        sc = OW / 1920
+        sc = S
         ov = np.zeros(img.shape[:2], np.float32)
         y = (self.y + t * (0.035 + 0.11 * self.z)) % 1.0
         x = (self.x + 0.012 * np.sin(t * 0.9 + self.ph) + t * 0.004) % 1.0
@@ -292,12 +341,12 @@ def glass(img, t, t0, p, seed=3):
     r = np.random.default_rng(seed)
     n = 70
     ang = r.uniform(-math.pi * 0.2, math.pi * 1.2, n)
-    sp = r.uniform(250, 900, n) * OW / 1920
+    sp = r.uniform(250, 900, n) * S
     ov = np.zeros(img.shape[:2], np.float32)
     for i in range(n):
         x = p[0] + math.cos(ang[i]) * sp[i] * u
-        y = p[1] + math.sin(ang[i]) * sp[i] * u + 900 * u * u * OW / 1920
-        s = r.uniform(3, 11) * OW / 1920
+        y = p[1] + math.sin(ang[i]) * sp[i] * u + 900 * u * u * S
+        s = r.uniform(3, 11) * S
         rot = ang[i] + u * r.uniform(-12, 12)
         pts = np.array([[x + s * math.cos(rot + k * 2.1), y + s * math.sin(rot + k * 2.1) * 0.6] for k in range(3)], np.int32)
         cv2.fillConvexPoly(ov, pts, 1.0, cv2.LINE_AA)
@@ -335,7 +384,7 @@ def crt(img, rect, t):
     reg = img[y0:y1, x0:x1]
     h = y1 - y0
     yy = np.arange(h, dtype=np.float32)[:, None]
-    lines = 1 - 0.1 * (np.sin(yy * math.pi / max(2, 3 * OW / 1920)) ** 2)
+    lines = 1 - 0.1 * (np.sin(yy * math.pi / max(2, 3 * S)) ** 2)
     band = 1 + 0.07 * np.exp(-(((yy / h - (t * 0.35) % 1.3 + 0.15) / 0.06) ** 2))
     noise = 1 + 0.06 * np.random.default_rng(int(t * 24)).standard_normal(reg.shape[:2]).astype(np.float32)[..., None]
     img[y0:y1, x0:x1] = reg * (lines * band)[..., None] * noise
@@ -352,7 +401,7 @@ def firelight(img, t, p, radius, amount=0.35):
     """Warm light that breathes over everything near the fire (multiplies the picture, so dark stays dark)."""
     yy, xx = np.ogrid[:OH, :OW]
     f = flicker(t)
-    jx, jy = 6 * math.sin(t * 7.1) * OW / 1920, 4 * math.sin(t * 5.3) * OW / 1920  # the flames move
+    jx, jy = 6 * math.sin(t * 7.1) * S, 4 * math.sin(t * 5.3) * S  # the flames move
     g = np.exp(-(((xx - p[0] - jx) ** 2 + (yy - p[1] - jy) ** 2) / (2 * (radius * f) ** 2))).astype(np.float32)
     gain = 1 + amount * (f - 0.95) * 4 * g[..., None] * np.array([1.0, 0.75, 0.45], np.float32)
     return img * gain + g[..., None] * np.array([40, 18, 0], np.float32) * amount * (f - 0.6)
@@ -388,7 +437,7 @@ class Rain:
         self.z = r.choice([0.35, 0.6, 1.0], n, p=[0.5, 0.33, 0.17])
 
     def draw(self, img, t, amount=1.0, slant=0.12):
-        sc = OW / 1920
+        sc = S
         ov = np.zeros(img.shape[:2], np.float32)
         n = int(len(self.x) * amount)
         y = (self.y[:n] + t * (1.6 + 2.2 * self.z[:n])) % 1.0
@@ -424,8 +473,8 @@ class Fireflies:
             x = x0 + (x1 - x0) * ((self.p[i, 0] + 0.03 * math.sin(t * self.sp[i] + self.ph[i])) % 1)
             y = y0 + (y1 - y0) * ((self.p[i, 1] + 0.04 * math.sin(t * self.sp[i] * 0.7 + self.ph[i] * 2)) % 1)
             on = max(0.0, math.sin(t * 1.3 * self.sp[i] + self.ph[i])) ** 3
-            cv2.circle(ov, (int(x), int(y)), max(1, int(2 * OW / 1920)), (210 * on, 240 * on, 120 * on), -1, cv2.LINE_AA)
-        return img + cv2.GaussianBlur(ov, (0, 0), 3 * OW / 1920) * 3 + ov
+            cv2.circle(ov, (int(x), int(y)), max(1, int(2 * S)), (210 * on, 240 * on, 120 * on), -1, cv2.LINE_AA)
+        return img + cv2.GaussianBlur(ov, (0, 0), 3 * S) * 3 + ov
 
 
 # ---------------------------------------------------------------- shots
@@ -461,22 +510,66 @@ class Shot:
                 k = amp * math.exp(-u * 7)
                 v[0] += k * math.sin(u * 61)
                 v[1] += k * math.cos(u * 47)
-        h = min(SH, v[2])
-        w = h * 16 / 9
-        v[0] = min(max(v[0], w / 2), SW - w / 2)
-        v[1] = min(max(v[1], h / 2), SH - h / 2)
-        return v[0], v[1], h
+        return clamp_cam(v[0], v[1], v[2])
 
     def to_screen(self, p, cam):
         cx, cy, h = cam
         s = h / OH
-        return ((p[0] - (cx - h * 8 / 9)) / s, (p[1] - (cy - h / 2)) / s)
+        return ((p[0] - (cx - h * AR / 2)) / s, (p[1] - (cy - h / 2)) / s)
+
+
+def clamp_cam(cx, cy, h):
+    """Keep a camera inside the picture. Landscape: h is at most the image height. Portrait: h may go past the image
+    height, up to the whole image width in view; the picture then sits in a framed window with a soft backdrop of
+    itself above and below (a "wide shot window"), and cy slides the window up or down the frame."""
+    h = min(max(SH, SW / AR) if PORTRAIT else SH, h)
+    w = h * AR
+    cx = min(max(cx, w / 2), SW - w / 2) if w <= SW else SW / 2
+    cy = min(max(cy, h / 2), SH - h / 2) if h <= SH else min(max(cy, SH - h / 2), h / 2)
+    return cx, cy, h
+
+
+_backdrops = {}
+
+
+def window(img, name, cam):
+    """Portrait wide shot: when the camera is pulled back past the image height, fill above and below the picture
+    with a dark, blurred copy of it, and give the picture a thin cream border and a soft shadow."""
+    cx, cy, h = cam
+    if h <= SH + 0.5:
+        return img
+    sc = OH / h
+    y0, y1 = int(round((0 - (cy - h / 2)) * sc)), int(round((SH - (cy - h / 2)) * sc))
+    if name not in _backdrops:
+        a = up(name)
+        wv = int(min(a.shape[1], a.shape[0] * AR))
+        c = a[:, (a.shape[1] - wv) // 2:(a.shape[1] - wv) // 2 + wv]
+        small = cv2.resize(c, (OW // 8, OH // 8), interpolation=cv2.INTER_AREA).astype(np.float32)
+        small = cv2.GaussianBlur(small, (0, 0), 5)
+        bg = cv2.resize(small, (OW, OH), interpolation=cv2.INTER_CUBIC)
+        _backdrops[name] = bg * 0.34 + np.array([14, 22, 23], np.float32)
+        if len(_backdrops) > 6:
+            _backdrops.pop(next(iter(_backdrops)))
+    out = _backdrops[name].copy()
+    a0, a1 = max(0, y0), min(OH, y1)
+    sh = np.zeros((OH, 1, 1), np.float32)  # a soft shadow under the picture
+    sh[a0:min(OH, a1 + int(40 * S))] = 1
+    sh = cv2.GaussianBlur(sh[:, :, 0], (0, 0), 18 * S)[..., None] if S > 0 else sh
+    out *= 1 - 0.45 * sh
+    out[a0:a1] = img[a0:a1]
+    b = max(2, int(round(6 * S)))
+    cream = np.array(COL["cream"], np.float32)
+    if y0 > 0:
+        out[max(0, y0 - b):y0] = cream
+    if y1 < OH:
+        out[y1:min(OH, y1 + b)] = cream
+    return out
 
 
 def warp(img2x, cam, interp=cv2.INTER_LINEAR):
     cx, cy, h = cam
     s = UP * h / OH
-    x0, y0 = UP * (cx - h * 8 / 9), UP * (cy - h / 2)
+    x0, y0 = UP * (cx - h * AR / 2), UP * (cy - h / 2)
     M = np.float32([[s, 0, x0], [0, s, y0]])
     return cv2.warpAffine(img2x, M, (OW, OH), flags=interp | cv2.WARP_INVERSE_MAP, borderMode=cv2.BORDER_REPLICATE)
 
@@ -487,9 +580,9 @@ def blurred_warp(a, s, t, cam):
     c0, c1 = s.cam(t - 0.25 / FPS), s.cam(t + 0.25 / FPS)
     sc = OH / cam[2]
     speed = max(abs(c1[0] - c0[0]) * sc, abs(c1[1] - c0[1]) * sc, abs(c1[2] - c0[2]) / cam[2] * OW) * 2
-    if speed < 5 * OW / 1920:
+    if speed < 5 * S:
         return warp(a, cam).astype(np.float32)
-    n = int(min(7, 2 + speed / (10 * OW / 1920)))
+    n = int(min(7, 2 + speed / (10 * S)))
     acc = np.zeros((OH, OW, 3), np.float32)
     for k in range(n):
         u = k / (n - 1)
@@ -497,11 +590,18 @@ def blurred_warp(a, s, t, cam):
     return acc / n
 
 
+TRANSITIONS = {}  # name -> f(a, b, u): transitions a film adds for itself (see creative.md)
+
+
 def transition(tr, a, b, u):
     """Blend the outgoing frame a into the incoming b; u runs 0 -> 1. ("dissolve", secs), ("whip", secs, +1/-1)
     (both frames slide sideways under a strong horizontal blur), ("flash", secs) (a soft white bloom between)."""
     u = min(1.0, max(0.0, u))
     kind = tr[0]
+    if callable(kind):  # your own transition: f(a, b, u) -> frame
+        return kind(a, b, u)
+    if kind in TRANSITIONS:
+        return TRANSITIONS[kind](a, b, u)
     if kind == "whip":
         d = tr[2] if len(tr) > 2 else 1
         e = ease(u)
@@ -533,7 +633,7 @@ class Finish:
         vig = L.vignette if vig is None else vig
         warm, con, sht, self.sat = L.warmth, L.contrast, L.shadow_tint, L.saturation
         r = np.random.default_rng(seed)
-        self.grain = [cv2.GaussianBlur(r.standard_normal((OH, OW)).astype(np.float32), (0, 0), 0.6 * OW / 1920) * grain * 1.6
+        self.grain = [cv2.GaussianBlur(r.standard_normal((OH, OW)).astype(np.float32), (0, 0), 0.6 * S) * grain * 1.6
                       for _ in range(6)]
         yy, xx = np.mgrid[0:OH, 0:OW].astype(np.float32)
         d = np.hypot((xx - OW / 2) / (OW / 2), (yy - OH / 2) / (OH / 2)) / 1.414
@@ -636,6 +736,9 @@ class Batch:
         Returns the list of problems (and prints them)."""
         shots = sorted(self.shots, key=lambda s: s.t0)
         out, cards = [], {}
+        known = set(sfx_kinds())
+        for k in sorted({e["kind"] for e in self.sfx} - known):
+            out.append(f"{self.name} sound {k!r} is not an effect the engine knows: it would be silent (film.sfx_kinds(), film.sfx_kind)")
         for i, s in enumerate(shots):
             end = shots[i + 1].t0 if i + 1 < len(shots) else self.end
             img = s.kw.get("img", s.kind)
@@ -655,7 +758,7 @@ class Batch:
                     if s.kind == "paper":
                         break
                     cx, cy, h = s.cam(t)
-                    w = h * 16 / 9
+                    w = h * AR
                     vx0, vy0, vx1, vy1 = cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2
                     area = max(1.0, (x1 - x0) * (y1 - y0))
                     inside = max(0, min(x1, vx1) - max(x0, vx0)) * max(0, min(y1, vy1) - max(y0, vy0))
@@ -735,7 +838,7 @@ class Batch:
         ff = subprocess.Popen(["ffmpeg", "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{OW}x{OH}",
                                "-r", str(FPS), "-i", "-", "-c:v", "libx264", "-crf", "17", "-preset", ytf.x264_preset(),
                                "-pix_fmt", "yuv420p", str(silent)], stdin=subprocess.PIPE)
-        sc = OW / 1920
+        sc = S
         sprites = {k: sk.tool_sprite(k, 0.28 * sc) for k in ("pencil", "pen", "red", "brush")}  # small: it mustn't pull focus
         sprites["chalk"] = chalk_sprite(0.9 * sc)
         snow = Snow()
@@ -788,7 +891,11 @@ class Batch:
     def frame(self, s, t, snow):
         kw = s.kw
         if s.kind == "paper":
-            return kw["build"].frame(t)
+            img, pen = kw["build"].frame(t)
+            for f, t0_, t1_ in getattr(self, "overlays", []):  # reel captions, badge and cards stay up over a drawn page
+                if t0_ <= t <= t1_ and (PORTRAIT or getattr(f, "screen", False)):
+                    img = f(img, t, s, None)
+            return img, pen
         cam = s.cam(t)
         sheet_pen = None
         if s.kind == "drawin":
@@ -819,7 +926,7 @@ class Batch:
                 if k in s.layers.fade:
                     a *= s.layers.fade[k](t)
                 if k in HALO and a.max() > 0:
-                    r = max(2, int(5 * OW / 1920))
+                    r = max(2, int(5 * S))
                     h = cv2.GaussianBlur(cv2.dilate(a[..., 0], np.ones((2 * r + 1, 2 * r + 1), np.uint8)), (0, 0), r * 0.6)[..., None]
                     img = img * (1 - h * 0.75) + np.array(HALO[k], np.float32) * h * 0.75
                 img = img * (1 - a * 0.92) + np.array(c, np.float32) * a * 0.92
@@ -829,10 +936,12 @@ class Batch:
         if pen is None and sheet_pen is not None:
             p = np.array(s.to_screen(sheet_pen[1], cam))
             prev_p = getattr(s, "_pen", None)
-            s._pen = p if prev_p is None or np.hypot(*(p - prev_p)) > 400 * OW / 1920 else prev_p + (p - prev_p) * 0.35
+            s._pen = p if prev_p is None or np.hypot(*(p - prev_p)) > 400 * S else prev_p + (p - prev_p) * 0.35
             pen = (sheet_pen[0], tuple(s._pen), 600.0)
         elif sheet_pen is None:
             s._pen = None
+        if PORTRAIT and "img" in kw:
+            img = window(img, kw["img"], cam)
         for e in kw.get("fx", []):
             k = e[0]
             if k == "snow":
@@ -843,16 +952,16 @@ class Batch:
                 for (tf, p) in e[1]:
                     u = t - tf
                     if 0 <= u < 0.12:
-                        img = glow(img, s.to_screen(p, cam), 70 * OW / 1920, (255, 255, 255), 1.6 * (1 - u / 0.12))
+                        img = glow(img, s.to_screen(p, cam), 70 * S, (255, 255, 255), 1.6 * (1 - u / 0.12))
             elif k == "steam":
                 if e[1] <= t <= e[2]:
-                    img = steam(img, t, s.to_screen(e[3], cam), scale=OW / 1920 * 1.2)
+                    img = steam(img, t, s.to_screen(e[3], cam), scale=S * 1.2)
             elif k == "crt":
                 a, b_ = s.to_screen(e[1][:2], cam), s.to_screen(e[1][2:], cam)
                 img = crt(img, (*a, *b_), t)
             elif k == "alarm":
                 if e[1] <= t <= e[2]:
-                    img = glow(img, s.to_screen(e[3], cam), 160 * OW / 1920, (255, 40, 30), 0.35 * (0.5 + 0.5 * math.sin(t * 14)))
+                    img = glow(img, s.to_screen(e[3], cam), 160 * S, (255, 40, 30), 0.35 * (0.5 + 0.5 * math.sin(t * 14)))
             elif k == "fire":  # ("fire", p, radius, amount): firelight breathing over the picture
                 img = firelight(img, t, s.to_screen(e[1], cam), e[2] / (cam[2] / OH), e[3] if len(e) > 3 else 0.35)
             elif k == "embers":  # ("embers", p)
@@ -1040,6 +1149,107 @@ def _lp(x, hi, sr, order=2):
     return signal.sosfilt(signal.butter(order, hi, "lp", fs=sr, output="sos"), x).astype(np.float32)
 
 
+SFX = {}  # name -> f(e, L, sr, rng) -> samples: sounds a film adds for itself
+SFX3 = ("dice", "splash", "latch", "pop", "swipe", "tap", "creak", "gulls")
+_warned = set()
+
+
+def sfx_kind(name):
+    """Register a sound for b.fx(name, ...). The function gets the cue (its kind, t0, t1 and any extra keywords),
+    the length in samples from t0 to t1, the sample rate and a seeded random generator, and returns mono float
+    samples (any length) at a level relative to a voice peak of 0.5 (most effects peak around 0.05 - 0.3).
+
+        @film.sfx_kind("anvil")
+        def anvil(e, L, sr, r):
+            return film._hit(sr, 1900, 0.9, 5, r, noise=0.5, partials=((1, 1), (2.76, .5), (5.4, .25))) * 0.2
+    """
+    def deco(f):
+        SFX[name] = f
+        return f
+    return deco
+
+
+def sfx_kinds():
+    """Every sound b.fx() knows, built in or registered."""
+    src = Path(__file__).read_text()
+    names = set(re.findall(r'k == "([a-z_0-9]+)":?  ?#|elif k == "([a-z_0-9]+)"', src))
+    flat = {a or b_ for a, b_ in names} | set(re.findall(r'if k == "([a-z_0-9]+)"', src))
+    visual = {"snow", "glass", "flash", "steam", "crt", "alarm", "fire", "embers", "rain", "lightning", "fireflies", "fade_in", "fade_out"}
+    audio_too = {"fire", "rain", "alarm"}  # these are both a picture effect and a sound
+    return sorted((flat - (visual - audio_too)) | set(SFX3) | set(SFX) | {"doorbell"})
+
+
+def _sfx3(k, e, L, sr, r):
+    """Small close sounds for reels and comic beats (Caesar reels, Nov 2026): dice on stone, an oar or a stone
+    in water, a latch, a pop for a card landing, a paper swipe, a pin tap, a ship's timber, gulls."""
+    if k == "dice":  # two or three dice thrown: a rattle of clicks, then they settle
+        d = int(0.9 * sr)
+        x = np.zeros(d, np.float32)
+        j, gap = 0.0, 0.035
+        while j < 0.75:
+            h = _hit(sr, r.uniform(1800, 3200), 0.035, 120, r, noise=1.2) * r.uniform(0.4, 1.0) * (1 - j / 0.9)
+            _place(x, _bp(h, 900, 8000, sr), int(j * sr))
+            j += gap * r.uniform(0.6, 1.4)
+            gap *= 1.16
+        return x * 0.16
+    if k == "splash":  # an oar blade or a stone going into water: a slap, a fizz, a few drips
+        d = int(max(1.1, min(2.5, L / sr)) * sr)
+        tt = np.arange(d) / sr
+        x = _bp(r.standard_normal(d).astype(np.float32), 300, 5000, sr) * np.exp(-tt * 5) * (1 - np.exp(-tt * 90)) * 0.28
+        x += _lp(r.standard_normal(d).astype(np.float32), 220, sr) * np.exp(-tt * 9) * 0.35
+        for _ in range(6):
+            j = int(r.uniform(0.25, 0.95) * sr)
+            f0 = r.uniform(900, 2200)
+            m = int(0.05 * sr)
+            tm = np.arange(m) / sr
+            _place(x, (np.sin(2 * np.pi * (f0 + 6000 * tm) * tm) * np.exp(-tm * 60) * r.uniform(0.02, 0.06)).astype(np.float32), j)
+        return x
+    if k == "latch":  # an iron latch or bolt: a click, a short slide, a heavier clunk as it seats
+        d = int(0.7 * sr)
+        x = np.zeros(d, np.float32)
+        _place(x, _bp(_hit(sr, 2400, 0.05, 80, r, noise=1.0), 1200, 7000, sr) * 0.5, 0)
+        m = int(0.16 * sr)
+        _place(x, _bp(r.standard_normal(m).astype(np.float32), 1500, 5000, sr) * np.hanning(m) * 0.05, int(0.05 * sr))
+        _place(x, _lp(_hit(sr, 210, 0.35, 16, r, noise=0.8, partials=((1, 1), (2.3, .5), (3.9, .3))), 3000, sr) * 0.45, int(0.22 * sr))
+        return x * 0.4
+    if k == "pop":  # a card or a cut-out landing: a soft, round pop with a tiny paper tick
+        d = int(0.22 * sr)
+        tt = np.arange(d) / sr
+        f = 520 * np.exp(-tt * 22) + 170
+        x = np.sin(2 * np.pi * np.cumsum(f) / sr) * np.exp(-tt * 26) * 0.3
+        x[:int(0.01 * sr)] += _bp(r.standard_normal(int(0.01 * sr)).astype(np.float32), 2000, 8000, sr) * 0.08
+        return x.astype(np.float32)
+    if k == "swipe":  # paper passing the lens: a short airy sweep that rises and falls in pitch
+        d = int(0.38 * sr)
+        tt = np.arange(d) / sr
+        n_ = r.standard_normal(d).astype(np.float32)
+        x = (_bp(n_, 500, 2500, sr) * (1 - tt / tt[-1]) + _bp(n_, 2500, 9000, sr) * (tt / tt[-1])) * np.sin(np.pi * tt / tt[-1]) ** 2
+        return (x * 0.1).astype(np.float32)
+    if k == "tap":  # a pencil point or a pin set down on paper
+        return _bp(_hit(sr, 1500, 0.06, 70, r, noise=0.9), 600, 6000, sr) * 0.2
+    if k == "creak":  # a ship's timber or an old door working: a slow stick-slip groan
+        d = max(int(0.8 * sr), L)
+        tt = np.arange(d) / sr
+        f = 95 + 40 * np.sin(2 * np.pi * 0.7 * tt + r.uniform(0, 6)) + 12 * np.sin(2 * np.pi * 3.1 * tt)
+        saw = 2 * ((np.cumsum(f) / sr) % 1) - 1
+        x = _bp(saw.astype(np.float32), 250, 2600, sr) * (0.5 + 0.5 * np.sin(2 * np.pi * 0.45 * tt)) ** 2
+        x *= np.sin(np.pi * np.arange(d) / d) ** 0.7
+        return (x * 0.05).astype(np.float32)
+    # gulls: a few far cries over the shore
+    d = max(int(1.5 * sr), L)
+    x = np.zeros(d, np.float32)
+    j = r.uniform(0.1, 0.6)
+    while j < d / sr - 0.5:
+        for c in range(int(r.integers(2, 5))):
+            m = int(r.uniform(0.16, 0.3) * sr)
+            tm = np.arange(m) / sr
+            f = r.uniform(1500, 2100) * (1 + 0.35 * np.sin(np.pi * tm / tm[-1]))
+            y = np.sin(2 * np.pi * np.cumsum(f) / sr) + 0.4 * np.sin(4 * np.pi * np.cumsum(f) / sr)
+            _place(x, (y * np.hanning(m) * r.uniform(0.3, 1.0)).astype(np.float32), int((j + c * 0.33) * sr))
+        j += r.uniform(1.8, 4.5)
+    return _bp(x, 900, 6000, sr) * 0.03
+
+
 def _sfx(e, n, sr):
     """Synthesised effects. Levels are relative to a voice peak of 0.5."""
     r = np.random.default_rng(abs(hash((e["kind"], round(e["t0"], 2)))) % 2 ** 32)
@@ -1050,7 +1260,13 @@ def _sfx(e, n, sr):
     L = max(1, i1 - i0)
     tt = np.arange(L) / sr
     k = e["kind"]
-    if k == "wind":
+    if k in SFX:  # a sound this film made for itself (see sfx_kind)
+        x = np.asarray(SFX[k](e, L, sr, r), np.float32)
+        L = len(x)
+    elif k in SFX3:
+        x = _sfx3(k, e, L, sr, r)
+        L = len(x)
+    elif k == "wind":
         x = _bp(r.standard_normal(L).astype(np.float32), 150, 900, sr)
         gust = 0.6 + 0.4 * np.sin(2 * np.pi * 0.13 * tt + r.uniform(0, 6)) * np.sin(2 * np.pi * 0.07 * tt)
         x *= gust * 0.05
@@ -1217,6 +1433,8 @@ def _sfx(e, n, sr):
         fl = (tt > 0.08).astype(np.float32) * np.exp(-np.clip(tt - 0.08, 0, None) * 5) * (1 - np.exp(-np.clip(tt - 0.08, 0, None) * 60))
         x += _bp(r.standard_normal(d).astype(np.float32), 300, 3500, sr) * fl * 0.35
         x += _lp(r.standard_normal(d).astype(np.float32), 900, sr) * (tt > 0.3) * np.exp(-np.clip(tt - 0.3, 0, None) * 2) * 0.05
+    elif k in ("hooves", "tick", "ticker", "bell", "doorbell", "coins", "steps", "surf", "press", "scratch", "drum", "organ"):
+        x = _sfx2(k, e, L, sr, r)
     elif k == "wav":  # a recorded or generated sound file (walla, a ship's horn...): e["path"], looped to the length
         import soundfile as _sf
         y, ysr = _sf.read(str(e["path"]), dtype="float32")
@@ -1273,6 +1491,9 @@ def _sfx(e, n, sr):
         f = min(L // 3, int(0.8 * sr))
         x[:f] *= np.linspace(0, 1, f); x[L - f:] *= np.linspace(1, 0, f)
     else:
+        if k not in _warned:  # a misspelt or unknown sound used to pass in silence: say so
+            _warned.add(k)
+            print(f"!! no such sound effect: {k!r} (silent). Known: {', '.join(sfx_kinds())}", flush=True)
         x = np.zeros(L, np.float32)
     x = x[:max(0, min(L, n - i0))] * 10 ** (e["db"] / 20)
     out[i0:i0 + len(x)] = x
@@ -1297,7 +1518,7 @@ def _pen_sound(log, n, sr, voice):
     for i in range(1, len(log)):
         (ta, pa), (tb, pb) = log[i - 1], log[i]
         if ta and ta == tb and pa and pb:
-            sp[i] = min(3000.0, math.hypot(pb[0] - pa[0], pb[1] - pa[1]) * FPS * 1920 / OW)
+            sp[i] = min(3000.0, math.hypot(pb[0] - pa[0], pb[1] - pa[1]) * FPS / S)
     out = np.zeros(n, np.float32)
     on_all = np.zeros(n, np.float32)
     for name, (lo, hi, g) in TOOLS.items():
@@ -1392,7 +1613,7 @@ class Paper:
     """A sketchbook page at 2x output size with live strokes; camera = (cx, cy, w) keys in page px."""
 
     def __init__(self, t0, cam, color="paper"):
-        self.W, self.H = 3840, 2160
+        self.W, self.H = (2160, 3840) if PORTRAIT else (3840, 2160)
         r = np.random.default_rng(9)
         w, h = OW, OH
         mottle = cv2.resize(ndimage.gaussian_filter(r.standard_normal((h // 4, w // 4)), 18).astype(np.float32), (w, h))
@@ -1667,7 +1888,7 @@ class Page:
         m = warp(main, cam)[..., None]
         tex = warp(self.tex, cam)[..., None]
         col = np.array(MEDIA[self.medium]["col"], np.float32)
-        sc = OW / 1920
+        sc = S
         if self.medium == "graphite":
             a = m * (0.4 + 0.6 * tex) * 0.88
             img = img * (1 - a) + img * (col / 255) * a  # graphite darkens what is under it
@@ -1964,3 +2185,106 @@ def timeline_page(t0, t1, events, line_t=0.8, title=None):
         if bottom:
             f.text(bottom, (x - 70, y + 100), 50, te + 0.4, 0.6, color="ink", angle=-3)
     return pg
+
+
+def _hit(sr, f, dur, decay, r, noise=0.3, partials=((1, 1.0),)):
+    """One struck sound: tonal partials plus a noise click, exponential decay."""
+    d = int(dur * sr); tt = np.arange(d) / sr
+    y = sum(a * np.sin(2 * np.pi * f * m * tt + r.uniform(0, 6)) for m, a in partials)
+    y = y + noise * r.standard_normal(d) * np.exp(-tt * decay * 4)
+    return (y * np.exp(-tt * decay)).astype(np.float32)
+
+
+def _place(x, y, j):
+    if 0 <= j < len(x):
+        m = min(len(y), len(x) - j)
+        x[j:j + m] += y[:m]
+
+
+def _sfx2(k, e, L, sr, r):
+    """More synthesised effects (Grant film, Nov 2026): hooves, a clock, a stock ticker, bells, coins, footsteps,
+    surf, a steam press, a pen nib, a muffled drum, an organ chord."""
+    x = np.zeros(L, np.float32)
+    tt = np.arange(L) / sr
+    if k == "hooves":  # trot on cobbles (fast=True: a gallop on a dirt road), wheels rumbling under it
+        step = 0.16 if e.get("fast") else 0.27
+        j = 0.0
+        while j < L / sr:
+            for dj in (0.0, step * 0.42):
+                h = _hit(sr, r.uniform(700, 1100), 0.09, 55, r, noise=0.9) * r.uniform(0.6, 1.0)
+                _place(x, _bp(h, 400, 4000, sr) * (0.4 if e.get("fast") else 1.0), int((j + dj) * sr))
+            j += step * 2 * r.uniform(0.95, 1.05)
+        x = x * 0.09 + _lp(r.standard_normal(L).astype(np.float32), 160, sr) * (0.06 if e.get("fast") else 0.035)
+    elif k == "tick":  # a mantel clock: tick, tock
+        for i, j in enumerate(np.arange(0, L / sr, 1.0)):
+            _place(x, _bp(_hit(sr, 2600 if i % 2 else 2100, 0.05, 90, r, noise=0.6), 1200, 6000, sr), int(j * sr))
+        x *= 0.07
+    elif k == "ticker":  # a stock ticker printing: fast type-wheel clicks in bursts
+        j = 0.0
+        while j < L / sr:
+            burst = r.uniform(0.6, 1.6)
+            q = j
+            while q < j + burst and q < L / sr:
+                _place(x, _bp(_hit(sr, r.uniform(1800, 3200), 0.03, 140, r, noise=0.8), 900, 7000, sr) * r.uniform(0.5, 1), int(q * sr))
+                q += r.uniform(0.045, 0.09)
+            j = q + r.uniform(0.15, 0.5)
+        x *= 0.07
+    elif k in ("bell", "doorbell"):  # a church bell far off (strokes every ~2.4 s) / a house bell pulled by hand
+        if k == "bell":
+            f, P, gap, dur, dec, g = 220 * r.uniform(0.95, 1.05), ((0.5, .5), (1, 1), (1.19, .45), (1.5, .35), (2, .3), (2.51, .2), (2.66, .15)), 2.4, 4.0, 0.9, 0.07
+        else:
+            f, P, gap, dur, dec, g = 1320, ((1, 1), (2.76, .35), (5.4, .15)), 0.22, 1.2, 4.0, 0.06
+        n = int(e.get("n", 99))
+        for i, j in enumerate(np.arange(0, L / sr, gap)):
+            if i >= n:
+                break
+            _place(x, _hit(sr, f, dur, dec, r, noise=0.02, partials=P) * r.uniform(0.8, 1.0), int(j * sr))
+        x *= g
+        if e.get("far", k == "bell"):
+            x = _lp(x, 1800, sr) * 0.8
+    elif k == "coins":  # coins set down on a cloth-covered table
+        for j in np.sort(r.uniform(0, min(L / sr, 0.9), int(e.get("n", 5)))):
+            _place(x, _hit(sr, r.uniform(3000, 5200), 0.25, 18, r, noise=0.15, partials=((1, 1), (1.47, .6), (2.3, .4))), int(j * sr))
+        x *= 0.05
+    elif k == "steps":  # footsteps on stone; crutch=True adds the wooden tap of a pair of crutches before each step
+        gap = float(e.get("gap", 0.62))
+        for i, j in enumerate(np.arange(0, L / sr, gap)):
+            if e.get("crutch") and i % 2 == 0:
+                _place(x, _bp(_hit(sr, 900, 0.06, 70, r, noise=0.5), 500, 3000, sr) * 0.8, int(j * sr))
+                j += 0.12
+            _place(x, _bp(_hit(sr, r.uniform(250, 420), 0.12, 40, r, noise=1.0), 150, 3500, sr), int(j * sr))
+        x *= 0.08
+    elif k == "surf":  # waves on a beach below: slow swells of filtered noise
+        n = _bp(r.standard_normal(L).astype(np.float32), 200, 2500, sr)
+        sw = np.clip(np.sin(2 * np.pi * tt / 7.5 + r.uniform(0, 6)), 0, 1) ** 2
+        x = n * (0.25 + 0.75 * sw) * 0.035 + _lp(r.standard_normal(L).astype(np.float32), 120, sr) * 0.03
+    elif k == "press":  # a steam printing press: a heavy stroke, a metal clank, a breath of steam, over and over
+        P_ = float(e.get("period", 0.72))
+        for j in np.arange(0, L / sr, P_):
+            _place(x, _hit(sr, 62, 0.35, 12, r, noise=0.2) * 1.0, int(j * sr))
+            _place(x, _bp(_hit(sr, r.uniform(1400, 1900), 0.18, 30, r, noise=0.6, partials=((1, 1), (1.6, .5), (2.9, .3))), 600, 6000, sr) * 0.5, int((j + P_ * 0.45) * sr))
+        x = x * 0.12 + _bp(r.standard_normal(L).astype(np.float32), 2000, 8000, sr) * 0.006
+    elif k == "scratch":  # a pen nib on paper: short strokes of fine scratching
+        j = 0.0
+        while j < L / sr:
+            d = r.uniform(0.15, 0.45)
+            a, b_ = int(j * sr), min(L, int((j + d) * sr))
+            if b_ > a:
+                seg = _bp(r.standard_normal(b_ - a).astype(np.float32), 2500, 9000, sr)
+                env = np.sin(np.pi * np.arange(b_ - a) / (b_ - a)) ** 0.6
+                x[a:b_] += seg * env
+            j += d + r.uniform(0.05, 0.25)
+        x *= 0.03
+    elif k == "drum":  # a muffled funeral drum, slow march
+        for j in np.arange(0, L / sr, float(e.get("gap", 1.3))):
+            _place(x, _lp(_hit(sr, 95, 0.6, 7, r, noise=0.6, partials=((1, 1), (1.5, .4))), 600, sr), int(j * sr))
+        x *= 0.12
+    elif k == "organ":  # a church organ chord, slow swell and release
+        ch = [130.8, 164.8, 196.0, 261.6]
+        y = sum(sum(np.sin(2 * np.pi * f * h * tt) / h for h in (1, 2, 3, 4)) for f in ch)
+        env = np.minimum(1, tt / 1.2) * np.minimum(1, (L / sr - tt) / 1.5)
+        x = _lp((y * env).astype(np.float32), 2200, sr) * 0.012
+    f = min(L // 4, int(0.25 * sr))
+    if f and k in ("surf", "hooves", "press", "scratch", "ticker"):
+        x[:f] *= np.linspace(0, 1, f); x[L - f:] *= np.linspace(1, 0, f)
+    return x.astype(np.float32)

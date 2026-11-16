@@ -150,8 +150,19 @@ Dark-ink writing over a dark part of the base gets a paper glow automatically.
 `("fade_out", t0, t1)`; camera `shake=[(t, amp)]`.
 
 ## Sounds (`b.fx(kind, t0, t1=None, db=0)`)
-fire, night, rain, thunder, wind, guns, engine (`away=True`), crowd, shutter, knock, thud, stamp, bolt, static, morse,
-type, whoosh, hum, door, ring, alarm, smash. Levels are relative to the voice; most beds sit at −6…−14 dB.
+alarm, bell, bolt, clink, coins, creak, crowd, dice, door, doorbell, drum, engine (`away=True`), fire, gulls, guns,
+hooves (`fast=True`), hum, knock, latch, morse, night, organ, paper, pop, press, rain, ring, rip, rotor, scratch, shutter,
+smash, splash, stamp, static, steps, strike, surf, swipe, tap, thud, thunder, tick, ticker, train, type, whoosh, wind,
+and `wav` (`path=` a recorded file, looped to the length). Levels are relative to the voice; most beds sit at −6…−14 dB.
+`film.sfx_kinds()` lists them; an unknown name is reported by `b.check()` and at render time instead of passing in
+silence. Add a film's own with `@film.sfx_kind("name")` (see `references/creative.md`).
+
+## Portrait and going past the base set
+`--portrait` (or `YTF_FORMAT=portrait`, or a project file `format` containing `portrait`) renders 1080 × 1920 with the same
+shots, marks, pages and effects; `reel.py` adds captions, badge, headline and pop-ups: `references/portrait.md`.
+`film.S` is the screen unit and `film.AR` the frame shape; use them instead of 1920/1080 numbers in new code.
+Transitions take a function: `trans=(f, secs)` with `f(a, b, u)`, or register a name in `film.TRANSITIONS`.
+How and when to write a film's own effects, transitions and sounds: `references/creative.md`.
 
 ## Workflow per batch
 1. Print the batch's word timings; make a gridded contact sheet of its images (to place labels, fire points, lines).
