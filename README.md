@@ -1,7 +1,8 @@
 # yt-film
 
 **A Claude Code skill and a Python film engine that turn ~150 still images and a narration into a finished,
-living YouTube documentary.** Point Claude at this repo, let it install the engine, and make films where every
+living YouTube video**: a true-story documentary like the example, or an explainer, a countdown, a story time, a
+kids' story, a book summary, in your own art style and look. Point Claude at this repo, let it install the engine, and make films where every
 picture breathes: chimney smoke, breath in the cold, flickering lamps and the light they throw, snow and rain,
 objects lifted out of the painting, drawings inking themselves in, typewriter labels, acting faces, comic pages, a
 living map, footnote cards, rubber stamps, rolling counters, tears and shatters, all timed to the narrator's words,
@@ -13,6 +14,30 @@ Choose the [yt-film skill](SKILL.md) for landscape documentaries or [yt-film-ree
 for vertical social episodes. [Caesar and the Pirates](examples/caesar/README.md) shows the reel workflow in four
 finished parts and includes reusable character pop-up artwork and a demo.
 The [Caricature Stylesheet](styles/caricature/README.md) packages that illustrated look for other stories.
+### Install in one step: copy this into Claude Code
+Open [Claude Code](https://claude.com/claude-code) (the desktop app or `claude` in a terminal), paste the prompt
+below, and let Claude do the installing. It clones this repo, reads these docs and the install runbook, sets up
+Python, FFmpeg and the engine, checks everything, and shows you a working example. Click the copy button at the
+top right of the box:
+
+```text
+Install the yt-film skill on this computer and set it up for me.
+
+Repo: https://github.com/AGBOOLA-JOEL/yt-film
+
+1. Clone it into my personal Claude skills folder: ~/.claude/skills/yt-film on Mac/Linux, or
+   %USERPROFILE%\.claude\skills\yt-film on Windows. If it's already there, run git pull instead.
+2. Read README.md and references/install.md in that folder, then follow the "Install runbook (for Claude)"
+   in references/install.md step by step.
+3. Ask me before installing anything system-wide (Homebrew, winget, apt packages), and tell me what each one is for.
+4. Run the setup script for my system, then scripts/doctor.py, and fix every [!!] line until everything says [ok].
+5. Ask me for my channel name and whether I have a Gemini API key. If I do, tell me exactly where to paste it in
+   .env myself; never write my key anywhere else or show it back to me.
+6. Prove it works: create the Chadwick example project and show me a stills sheet of batch b1 (no rendering).
+7. Finish with a short summary: what was installed, where, what's left for me, and remind me to restart Claude Code
+   so the skill loads.
+```
+Prefer to do it yourself? See [Install](#install).
 
 <p align="center">
   <img src="examples/chadwick/look/comic_page.jpg" width="32%">
@@ -29,12 +54,27 @@ from a muff and landing, handwriting on the note, an acting face, a drawing made
 on a card, a rolling money counter, a glass-shatter transition, a crowd, a stamp, the note torn in two, a footnote).
 
 **New in v2 (Nov 2026):** camera moves with a purpose (an ease per segment, one move instead of a cut inside a
-picture), focus that pulls from one person to another, snow and rain that fall *behind* nearer things, soft form
+picture), depth focus that softens the setting and keeps people sharp, snow and rain that fall *behind* nearer things, soft form
 shading on the faces, typed paper tags that a push-in can never crop, insets on pinned scraps, pauses inside the
 narration, a voice mastering chain, and a score that rises in the pauses.
 ▶ [`examples/chadwick/video/chadwick_b4_v2.mp4`](examples/chadwick/video/chadwick_b4_v2.mp4) (72 s; shot list:
 [`shots_b4_v2.py`](examples/chadwick/tools/shots_b4_v2.py)). Depth needs an optional extra:
 `pip install torch transformers`, then `python tools/depth.py` once per film (see `references/engine.md`).
+
+**Make it yours (Nov 2026):** the example's pastel-gouache "true story" style is only the default.
+- **7 engine looks** (`YTF_LOOK`): `gouache`, `clean`, `noir`, `chalk`, `comic`, `storybook`, `blueprint`, each
+  setting the grade, grain, ink, tag paper, accent colour, fonts and drawing sound, fine-tuned per film in
+  `look.json`. ([styles](#make-it-yours-styles-looks-and-formats))
+- **Any image style**: opener blocks for flat editorial, noir ink, chalkboard, comic, storybook, blueprint and more;
+  characters can be egg heads, round heads, simple people, animals, or none at all.
+- **9 formats** (`--format`): `story`, `explainer`, `countdown`, `rise-fall`, `storytime`, `kids`, `summary`,
+  `case-study`, `news`, each with its own spine template, hook and image mix.
+- **Three ways to illustrate**, all in one reel ([`examples/illustration_reel/`](examples/illustration_reel/)):
+  marks sketched straight on the pictures (arrows, circles, level handwriting, numbers), scenes that draw
+  themselves, drawings pinned on scraps; **the sketchbook sheet itself** drawn and painted live with captions; and
+  **the blank page** filled with redrawn drawings, timelines and routes.
+- **Story-flow checks:** `story_check.py` (spoken dates, batch seams, where the story's drive starts) and render
+  checks for pictures held too long and fades to black between batches.
 
 ---
 
@@ -42,13 +82,15 @@ narration, a voice mastering chain, and a score that rises in the pauses.
 1. [What you need](#what-you-need)
 2. [Install (Mac and Windows)](#install)
 3. [From title to final film: the whole process](#from-title-to-final-film)
-4. [Images with any tool](#images-with-any-tool)
-5. [Voice: Gemini TTS or your own](#voice)
-6. [Music, dubs, thumbnails, the ending](#music-dubs-thumbnails-the-ending)
-7. [Slow PCs](#slow-pcs)
-8. [The Chadwick example](#the-chadwick-example)
-9. [Repo map](#repo-map)
-10. [Troubleshooting](#troubleshooting)
+4. [Make it yours: styles, looks and formats](#make-it-yours-styles-looks-and-formats)
+5. [Images with any tool](#images-with-any-tool)
+6. [Voice: Gemini TTS or your own](#voice)
+7. [Music, dubs, thumbnails, the ending](#music-dubs-thumbnails-the-ending)
+8. [Slow PCs](#slow-pcs)
+9. [The Chadwick example](#the-chadwick-example)
+10. [Repo map](#repo-map)
+11. [Troubleshooting](#troubleshooting)
+12. [Licence and contributing](#licence-and-contributing)
 
 ---
 
@@ -64,12 +106,19 @@ narration, a voice mastering chain, and a score that rises in the pauses.
 
 ## Install
 
-**The easy way:** open Claude Code and say:
+**The easy way (recommended):** paste the [install prompt](#install-in-one-step-copy-this-into-claude-code) into
+Claude Code. Claude follows the runbook in [`references/install.md`](references/install.md): it clones the repo into
+your skills folder, asks before installing system tools, runs the setup script, fixes everything the doctor reports,
+helps you fill in `.env` (you paste your key yourself), and shows you a stills sheet from the example to prove it
+works. It takes 10–20 minutes, mostly downloads.
 
-> Install the yt-film skill from https://github.com/AGBOOLA-JOEL/yt-film and set it up on this computer.
-
-Claude clones it into `~/.claude/skills/yt-film`, runs the right setup script, checks everything with the doctor
-and fixes what's missing. (It's a private repo: run `gh auth login` first, or be added as a collaborator.)
+**Already installed? Copy one of these into Claude Code:**
+```text
+Update the yt-film skill in my Claude skills folder: git pull, re-run the setup script if requirements changed, run scripts/doctor.py and fix anything it reports, then tell me what changed.
+```
+```text
+Start a new yt-film project. Ask me about my channel, the format and the look first (references/formats.md and references/art-styles.md), then follow the yt-film skill from the story onwards.
+```
 
 **By hand, macOS** (needs [Homebrew](https://brew.sh)):
 ```bash
@@ -94,18 +143,35 @@ Restart Claude Code; *"what skills do you have?"* should list **yt-film**.
 Details, Windows notes (Defender, OneDrive, long paths, new terminal after installs) and updating:
 [`references/install.md`](references/install.md).
 
+## Your first film: the short version
+
+Once the install has passed the doctor, everything else is a conversation with Claude. The commands it runs:
+```bash
+python scripts/new_project.py my_film --format story --look gouache   # 1. a project (formats and looks: below)
+#    2. Claude writes OUTLINE.md (the spine + facts), then IMAGE_GUIDE.md; you make the images into incoming/
+python tools/voice.py                                                 # 3. narration + word timings (or import_voice.py)
+python tools/music.py                                                 # 4. score cues (or your own tracks)
+python tools/stills.py b1                                             # 5. check each batch in seconds (no render)
+python tools/render_all.py                                            # 6. render, sized to your free memory
+python tools/final.py                                                 # 7. the final film, -14 LUFS
+```
+Run them from the project folder with the repo's Python (`~/.claude/skills/yt-film/.venv/bin/python` on a Mac,
+`%USERPROFILE%\.claude\skills\yt-film\.venv\Scripts\python` on Windows). Optional depth effects:
+`pip install torch transformers`, then `python tools/depth.py` once per film. Before the first full render on a
+16 GB machine or smaller, close the browser and read [`references/performance.md`](references/performance.md).
+
 ## From title to final film
 
 You talk to Claude; Claude runs the engine. Here is the whole road, with what you do and what Claude does.
 
 | # | Step | You | Claude | Result |
 |---|---|---|---|---|
-| 0 | **Idea** | "Find me 5 story ideas about early aviation" or bring your own title | researches candidates, checks YouTube for the gap, pitches with a recommendation | a story and a hook type |
-| 1 | **Project** | | `scripts/new_project.py <story>` | `~/yt-film-projects/<story>/` with the engine in `tools/` |
-| 2 | **Facts** | answer questions, approve | researches, writes `OUTLINE.md`: every fact with its source, weak ones flagged | a fact list the script must obey |
-| 3 | **Image guide** | say which image tool you use and the art style | writes `IMAGE_GUIDE.md`: the story beat by beat as ~150 shots (wide, medium, face, detail, point of view), the style opener, character blocks, sketch sheets, blank "bases", exact filenames | your storyboard |
+| 0 | **Idea** | "Find me 5 story ideas about early aviation" or bring your own title; pick a format and a look | researches candidates, checks YouTube for the gap, pitches with a recommendation | a story, a format and a hook type |
+| 1 | **Project** | | `scripts/new_project.py <story> --format <format> --look <look>` | `~/yt-film-projects/<story>/` with the engine in `tools/` |
+| 2 | **Facts and spine** | answer questions, approve the spine | researches, writes `OUTLINE.md`: the spine (one question, beats joined by *but* / *therefore*) and every fact with its source | the story's line and the facts it must obey |
+| 3 | **Image guide** | say which image tool you use and the art style | writes `IMAGE_GUIDE.md`: the spine beat by beat as ~150 shots, each naming the line it serves and what gets drawn on it (wide, medium, face, detail, point of view), the style opener, character blocks, sketch sheets, blank "bases", exact filenames | your storyboard |
 | 4 | **Images** | generate them in order (style card → cast → scenes → line versions → sheets → bases) and save them with the guide's names (or let `sort_images.py` name your downloads) | checks each group: hands, faces, era, text, framing; lists redos; writes a resume guide if a chat gets stuck | `incoming/` full |
-| 5 | **Script** | read, comment | writes `SCRIPT.md` **from the images**: one passage per beat, every image placed, facts checked against the outline, your end line | the narration |
+| 5 | **Script** | read, comment | writes `SCRIPT.md` **from the images**: one passage per beat (show a picture, then draw while explaining), every image placed, facts checked, `story_check.py` run (dates, batch seams, the drive), your end line | the narration |
 | 6 | **Voice** | listen to the 30-second test; or record/generate your own and hand Claude the file | Gemini TTS (slow read → 1.25x, pauses capped, pace evened out) or `import_voice.py`; Whisper times every word | `voice/bN_vo.wav` + word timings |
 | 7 | **Music** | approve the cues, or drop in your own tracks | writes Lyria prompts per section, generates them, maps them to batches | `audio/music/` |
 | 8 | **Shots** | look at the stills sheets | per batch: gridded image sheets → the living layers of every picture → a shot list cued on the words → `stills.py` contact sheet + readability check → fixes | `tools/shots_bN.py` |
@@ -118,6 +184,49 @@ You talk to Claude; Claude runs the engine. Here is the whole road, with what yo
 Claude never starts a render on its own: checking is done with stills sheets (~30 s a batch); rendering waits for
 your go-ahead. A typical film: images 3–5 hours of your time (manual) or minutes (API); everything else is mostly
 Claude's work across a few sessions.
+
+## Make it yours: styles, looks and formats
+
+The example is one channel's look. Your films should look like yours. Three choices, made once per channel (or per
+film) and kept:
+
+**1. The image style** (what your image tool paints), set by the opener at the top of the image guide. Tell Claude
+the style and attach two or three images you like; it writes the opener, the character blocks and the sketch-sheet
+prompts in that style. Starting points: gouache graphic novel, clean flat editorial, noir ink wash, chalkboard,
+bright comic, storybook watercolour, blueprint, linocut, travel poster, collage, pixel art. Characters can be egg
+heads, round heads, simple people with dot eyes, animals, silhouettes, or nobody at all (objects and diagrams).
+Faces act when they have two clear eyes and a simple mouth.
+
+**2. The engine look** (what the engine adds on top): in the project's `.env`,
+```
+YTF_LOOK=clean
+```
+| Look | Feels like |
+|---|---|
+| `gouache` | the default: warm print grade, grain, cream paper tags, brown ink, red pencil, typewriter |
+| `clean` | modern explainer: neutral, no grain, white tags, blue accent, bold sans |
+| `noir` | ink wash and crime: near-monochrome, hard contrast, heavy grain, monospace |
+| `chalk` | a classroom board: chalk-white lines, yellow accent, handwriting |
+| `comic` | bright comic: rich colour, no grain, yellow tags, stamp lettering |
+| `storybook` | children's book: soft warm grade, blue-grey ink, coral accent, handwriting |
+| `blueprint` | how-it-works: white lines, blue tags, orange accent, monospace |
+
+Change any value for one film in `look.json` at the project root (`{"accent": [20, 110, 220], "grain": 0}`).
+`python tools/look.py` lists the looks; `python tools/stills.py b1 8` shows the result on real frames in seconds.
+
+**3. The format** (how the film is told): `story`, `explainer`, `countdown`, `rise-fall`, `storytime`, `kids`,
+`summary`, `case-study`, `news`. Each has its own spine template (written into OUTLINE.md by
+`new_project.py --format`), hook, image mix and the engine features that carry it.
+
+```bash
+python scripts/new_project.py why_the_sky_is_dark --format explainer --look clean
+```
+
+Also make these your own: the ending (`cta.py`), the footnote art (`assets/footnote/`), thumbnails and music. Two
+channels with the same opener, look and footnote art will look like copies.
+Guides: [`references/art-styles.md`](references/art-styles.md) (styles, looks, openers, characters, testing a new
+style) · [`references/formats.md`](references/formats.md) (the formats) ·
+[`references/storytelling.md`](references/storytelling.md) (the spine, seams, dates, show then draw).
 
 ## Images with any tool
 
@@ -141,8 +250,7 @@ It names them in order, converts to PNG and writes a labelled contact sheet so y
 check by groups): [`references/consistency.md`](references/consistency.md).
 
 **Art style**: the example uses egg-headed people in an era-accurate world, ink line and matte pastel gouache.
-That's only a suggestion: watercolour, linocut, comic, chalk pastel, noir ink, children's-book, travel-poster...
-anything flat and sharp works. What the engine needs from a style: [`references/art-styles.md`](references/art-styles.md).
+That's only the default; see [Make it yours](#make-it-yours-styles-looks-and-formats).
 
 ## Voice
 
@@ -209,23 +317,27 @@ setup/                   install_mac.sh, install_windows.ps1
 scripts/                 new_project.py, doctor.py, sort_images.py, image_contact.py, video_stills.py
 engine/                  the film engine (copied into each project's tools/)
   film.py                frames, camera, marks, sound, the render loop, the readability check
-  seq.py                 the shot sequencer and builders: scene, drawin, page, map_shot, custom
+  seq.py                 the shot sequencer and builders: scene, drawin, page, sketchbook, blank, map_shot, custom
   fx2.py                 living layers: Smoke, Breath, Flame, Light, Lift, Draw, Tear, Counter, the map
-  fx3.py, depth.py       v2: pulled focus, snow and rain in depth, haze, lit faces, paper tags, pinned scraps; depth maps
+  fx3.py, depth.py       v2: depth focus (people stay sharp), snow and rain in depth, haze, lit faces, paper tags, pinned scraps; depth maps
   signature.py, wr.py    faces that act, comic pages, stamps, tags, photos, footnotes, rays, haze
   kit.py, sketch.py, stages.py   labels, pages, maps, pen strokes, drawing order
   voice.py, import_voice.py      narration (Gemini TTS / your own audio) + word timings
   music.py, walla.py     score and crowd murmur (Gemini)
-  render_all.py          parallel renders sized to the machine
+  look.py                the engine looks (YTF_LOOK, look.json): grade, grain, ink, paper, accent, fonts
+  flow.py, story_check.py   story-flow checks: held pictures, batch seams; dates, seams and the drive in the script
+  render_all.py          parallel renders sized to the machine's free memory
   final.py, cta.py, dub.py       final join, the example ending, dubbed tracks
   imagegen.py            optional automatic images (Gemini API)
   ytf.py                 portable paths, fonts, settings, Whisper (Mac/Windows/Linux)
   geo/                   Natural Earth land, borders, lakes (public domain)
 assets/footnote/         the footnote hand, note and board (replace with your own art if you like)
 fonts/                   free fonts downloaded by the setup (Windows/Linux)
-references/              the guides (install, images, consistency, styles, voice, music, dubs, thumbnails,
-                         ending, engine API, rendering, performance, troubleshooting, story finding, hooks)
+references/              the guides (install, images, consistency, styles and looks, formats, storytelling, voice,
+                         music, dubs, thumbnails, ending, engine API, rendering, performance, troubleshooting,
+                         story finding, hooks)
 examples/chadwick/       the complete example film and its effects test video
+examples/illustration_reel/   every illustration form in one labelled reel (shots file + video)
 ```
 
 ## Troubleshooting
@@ -237,5 +349,15 @@ images, cues Whisper misheard, memory, rate limits): [`references/troubleshootin
 
 Real archive photos in the example are public domain (Wikimedia Commons / Library of Congress, credited in
 `examples/chadwick/incoming/05_photos/CREDITS.md`). Fonts downloaded by the setup are under the SIL Open Font Licence
-or Apache 2.0. Natural Earth data is public domain. Private repository: all other content © the owner, not for
-redistribution.
+or Apache 2.0. Natural Earth data is public domain.
+
+## Licence and contributing
+
+yt-film is **source-available**, not open source: you can install it and use it to make and publish your own videos,
+personal or commercial, and the videos are yours. Redistributing or republishing the code (or a modified version)
+needs written permission. Full terms: [LICENSE](LICENSE).
+
+Issues, ideas, questions and show-and-tell posts are welcome: open an issue (forms for bugs, features, questions and
+sharing your films). Pull requests are open to invited collaborators only; if you've fixed something in your own
+copy, describe it in an issue and a collaborator will bring it in. See [CONTRIBUTING.md](CONTRIBUTING.md),
+[SECURITY.md](SECURITY.md) (report problems privately) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).

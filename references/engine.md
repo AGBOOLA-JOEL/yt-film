@@ -38,6 +38,32 @@ BATCHES, GAPS), `music.py` (CUES), `final.py` (BATCHES ending in `"cta"`, MUSIC)
 Full worked shot lists: `examples/chadwick/tools/shots_b1…b9.py`. Images are 1774 x 887 (2:1);
 all coordinates are **source px** of that image.
 
+## Three ways to illustrate (`seq.py`): on the picture, the sketchbook sheet, the blank page
+```python
+# 1. on the picture: marks on a scene, a scene drawing itself, a drawing pinned on a scrap
+m = Marks(); m.circle((380, 590), 250, 150, t, 0.6, color="red"); m.arrow(a, b, t, 0.5, color="red")
+m.text("all he had left", (1130, 230), 56, t, 0.9, color="redh", angle=0)   # level handwriting, cream halo
+sg.underline(m, a, b, t); sg.motion(m, c, -90, 3, 90, t); sg.leader(m, dot, text_xy, "words", t)
+S.at(t, scene("S01g_table", marks=m))
+S.at(t, drawin("S01a_wall_st", ink=(0.0, 2.2), flood=(2.0, 3.6), label="Wall Street"))
+S.at(t, scene("S15a_pressroom", draws=[Scrap((1480, 160), (300, 230), t0), Draw("X08_book", 1, (1480, 160), 200, (t0, t0 + 1.1), (t0 + 1.1, t0 + 1.7))]))
+# 2. the sketchbook sheet: drawings ink in then wash, captions, a circle; cues are seconds after the shot starts
+S.at(t, sketchbook("X03_machine", [(0, 0.3), (1, 3.4), (2, 6.4), (3, 9.6)],
+                   captions={0: "one bond", 1: "three envelopes"}, circles={0: (0.5, 0.78, 0.22, 0.18)}))
+# 3. the blank page: code-made sketchbook paper (or a base), drawings redrawn stroke by stroke, timelines, words
+def draw(pg, t0, t1):
+    pg.lift("X02_wall_st", 3, (330, 420), 560, t0 + 0.3, t0 + 2.6, fade=0.06)
+    pg.stroke([(1080, 600), (1560, 600)], t0 + 6.6, 0.7, width=3); pg.text("1884", (1460, 650), 40, t0 + 7.4, 0.4)
+S.at(t, blank(draw, medium="graphite", cam=lambda a, z: [(a, 500, 420, 760), (z, 887, 443, 887, "out")]))
+```
+- `sketchbook` wraps `kit.sheet` (camera visits each drawing as it inks, then pulls back to the page) and adds
+  level captions (`cap_color`, `cap_size`) and circles (fractions of the drawing's box). `done=` panels already drawn.
+- `blank` builds a `film.Page` on `paper_base()` (build/edit/PAPER_sketchbook.png, made once) unless `base=` names a
+  blank story object; media: graphite, chalk, sumi, carve. `page.lift(..., clip=, fade=, sweep=, thicken=)` as in Page.
+- All on-picture words: level (`angle=0`) or on the picture's own line (`Marks.write(a, b)`); `b.check()` flags
+  slanted handwriting (`flow.MAX_SLANT`).
+- Reference reel with every form: `examples/illustration_reel/shots_demo.py` (+ its video).
+
 ## v2: camera eases, depth, focus, face light, tags (`fx3.py`, through `seq.scene`)
 Worked example: `examples/chadwick/tools/shots_b4_v2.py`.
 ```python
@@ -52,7 +78,8 @@ S.at(t, page("B02_card", marks=m, cam=lambda a, z: [(a, 850, 300, 500), (z, 905,
 ```
 - `cam=`: a list of keys or a function `(t0, t1) -> keys`; a key is `(t, cx, cy, h)` plus an optional ease for the
   segment ending on it: `"io"` (default), `"out"` (fast start, long settle), `"in"`, `"lin"`, `"back"` (small overshoot).
-- `focus=`: a point `(x, y)` in source px, a depth (0 far - 1 near), or keys. Needs the picture's depth map.
+- `focus=`: a point `(x, y)` in source px, a depth (0 far - 1 near), or keys. Needs the picture's depth map. It
+  softens the setting only: detected people always stay sharp, softness is clamped to `fx3.MAX_SOFT` (0.55).
 - LIVE's `("snow", a)` / `("rain", a)` become `fx3.Snow` / `fx3.Rain` when a depth map exists (each flake hidden by
   anything nearer); `snow_z=(lo, hi)` limits how near flakes come. `haze=(amount, (r, g, b))`.
 - `light=(x, y)`: `fx3.FaceLight`; tune with `FaceLight(img, light, shadow=0.20, warm=0.07)` in `extra=[...]`.

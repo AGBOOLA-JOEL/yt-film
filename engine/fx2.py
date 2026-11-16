@@ -24,6 +24,7 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
 import film
+import look
 import ytf
 from film import UP, SW, SH, OW, OH, up, ease
 
@@ -614,8 +615,8 @@ class Counter:
         cv2.rectangle(tag, (20, 20), (pw + 20, ph + 20), 1.0, -1)
         sh = cv2.GaussianBlur(tag, (0, 0), 10) * 0.4 * k
         out = _blend(out, x0 - 14, y0 - 12, np.zeros((ph + 40, pw + 40, 3), np.float32), sh)
-        out = _blend(out, x0 - 20, y0 - 20, np.ones((ph + 40, pw + 40, 3), np.float32) * np.array((242, 232, 210), np.float32), tag * k * 0.97)
-        ink = np.array((38, 30, 24), np.float32)
+        out = _blend(out, x0 - 20, y0 - 20, np.ones((ph + 40, pw + 40, 3), np.float32) * np.array(look.rgb("paper"), np.float32), tag * k * 0.97)
+        ink = np.array(look.on_paper(), np.float32)
         x = x0 + int(30 * OW / 1920)
         y = y0 + int(22 * OW / 1920)
         g = self.glyph["$"]
@@ -997,5 +998,5 @@ class Traveller:
                                max(1, UP * 2), cv2.LINE_AA)
         cv2.circle(lay, (int(x), int(y)), int(self.r * UP), 1.0, -1, cv2.LINE_AA)
         halo = cv2.GaussianBlur(halo, (0, 0), 3) * 0.7
-        a = a * (1 - halo[..., None]) + np.array((246, 238, 220), np.float32) * halo[..., None]
+        a = a * (1 - halo[..., None]) + np.array(look.rgb("light"), np.float32) * halo[..., None]
         return a * (1 - lay[..., None]) + self.col * lay[..., None]

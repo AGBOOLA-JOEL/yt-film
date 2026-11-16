@@ -4,6 +4,10 @@
     python scripts/new_project.py chadwick --example chadwick   the finished example, ready to re-render
     python scripts/new_project.py my_story --dir D:/films     choose where (else YTF_WORKSPACE, else ~/yt-film-projects)
     python scripts/new_project.py my_story --update-engine    refresh tools/ with this repo's engine (keeps your shot files)
+    python scripts/new_project.py my_film --format explainer --look clean
+                                                              a format (spine template in OUTLINE.md) and an engine
+                                                              look (YTF_LOOK in .env); see references/formats.md
+                                                              and references/art-styles.md
 
 The project layout:
     my_story/
@@ -32,6 +36,36 @@ TEMPLATES = {
 }
 
 
+SPINES = {  # the spine template each format starts from (references/formats.md)
+    "story": ["what someone wanted", "BUT ... SO the decision / the first wrong act  [DRIVE]", "SO it grew ...",
+              "BUT ...", "SO it broke ...", "the cost, and the twist"],
+    "explainer": ["the puzzling fact", "the naive answer, BUT it fails", "SO the real mechanism, step 1  [DRIVE]",
+                  "THEREFORE step 2 ...", "THEREFORE step 3 ...", "what it means for you"],
+    "countdown": ["the promise of the list", "number N: hook, turn, payoff", "number N-1 (stronger) ...", "...",
+                  "number 1: the strongest, pays off the title  [DRIVE on the first entry]"],
+    "rise-fall": ["the problem it solved", "SO the breakthrough  [DRIVE]", "THEREFORE the boom (numbers)",
+                  "BUT the mistake / the rival", "SO the fall", "what's left today"],
+    "storytime": ["the setup in one breath", "BUT what went wrong  [DRIVE]", "SO it got worse", "the moment",
+                  "what changed"],
+    "kids": ["a small hero wants something", "SO they try  [DRIVE]", "BUT it goes wrong", "SO they help / are helped",
+             "the one thing they learn"],
+    "summary": ["the big claim", "BUT why it's surprising", "idea 1 + its example story  [DRIVE]", "idea 2 ...",
+                "idea 3 ...", "the strongest objection", "what to take away"],
+    "case-study": ["the result (the number)", "the situation", "SO the move  [DRIVE]", "THEREFORE the numbers as it played out",
+                   "BUT the reckoning", "the lesson"],
+    "news": ["what happened, in one sentence", "the background you need (only that)", "the players and what each wants  [DRIVE]",
+             "SO what happens next"],
+}
+
+
+def spine_text(fmt):
+    beats = "\n".join(f"{i}. {b}" for i, b in enumerate(SPINES[fmt], 1))
+    return (f"## Spine (format: {fmt}; references/storytelling.md and references/formats.md)\n\n"
+            f"QUESTION: the one question this film answers\n\n{beats}\n\n"
+            "Join every beat to the last with BUT or THEREFORE/SO, never \"and then\". Show this to the user before the "
+            "image guide.\n\n")
+
+
 def workspace(args):
     if "--dir" in args:
         return Path(args[args.index("--dir") + 1]).expanduser()
@@ -54,7 +88,16 @@ def copy_engine(tools, keep_existing):
 
 def main():
     args = sys.argv[1:]
-    names = [a for i, a in enumerate(args) if not a.startswith("--") and (i == 0 or args[i - 1] not in ("--dir", "--example"))]
+    names = [a for i, a in enumerate(args) if not a.startswith("--") and (i == 0 or args[i - 1] not in ("--dir", "--example", "--format", "--look"))]
+    fmt = args[args.index("--format") + 1] if "--format" in args else "story"
+    look_name = args[args.index("--look") + 1] if "--look" in args else None
+    if fmt not in SPINES:
+        raise SystemExit(f"unknown --format {fmt!r}: choose from {', '.join(SPINES)}")
+    if look_name:
+        sys.path.insert(0, str(REPO / "engine"))
+        from look import PRESETS
+        if look_name not in PRESETS:
+            raise SystemExit(f"unknown --look {look_name!r}: choose from {', '.join(PRESETS)}")
     if not names:
         print(__doc__)
         sys.exit(1)
@@ -84,7 +127,11 @@ def main():
         for fname, text in TEMPLATES.items():
             p = proj / fname
             if not p.exists():
-                p.write_text(text.format(name=name), encoding="utf-8")
+                body = text.format(name=name)
+                if fname == "OUTLINE.md":
+                    head, rest = body.split("\n\n", 1)
+                    body = head + "\n\n" + spine_text(fmt) + rest
+                p.write_text(body, encoding="utf-8")
     env = proj / ".env"
     if not env.exists() and (REPO / ".env").exists():
         shutil.copy2(REPO / ".env", env)
@@ -93,7 +140,13 @@ def main():
     text = env.read_text(encoding="utf-8")
     if "YTF_SKILL=" not in text:  # the project finds the shared art (footnote hand, note, board) and fonts here
         env.write_text(text.rstrip("\n") + f"\n\n# where the yt-film repo lives (assets/, fonts/)\nYTF_SKILL={REPO.as_posix()}\n", encoding="utf-8")
-    print("project ready:", proj)
+    text = env.read_text(encoding="utf-8")
+    if "YTF_FORMAT=" not in text:
+        text = text.rstrip("\n") + f"\n\n# the film's format (references/formats.md); story_check.py reads it\nYTF_FORMAT={fmt}\n"
+        env.write_text(text, encoding="utf-8")
+    if look_name and "YTF_LOOK=" not in text:
+        env.write_text(text.rstrip("\n") + f"\n\n# the engine look (references/art-styles.md): gouache clean noir chalk comic storybook blueprint\nYTF_LOOK={look_name}\n", encoding="utf-8")
+    print("project ready:", proj, f"(format: {fmt}, look: {look_name or 'gouache'})")
     print("next: open it in Claude Code and say what the film is about, or see the README's 'From title to final film'.")
 
 

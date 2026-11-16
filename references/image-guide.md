@@ -16,7 +16,8 @@ suggested default; for another style, adapt the opener and keep the engine's nee
   bottom edges.
 
 ## Structure of the guide
-1. Title, the look in one paragraph, **the story spine** (hook first, then the beats in order).
+1. Title, the look in one paragraph, **the spine** (the question and the but/therefore beats, from
+   `references/storytelling.md`). The rest of the guide follows the spine in order: one heading per beat.
 2. **Count table** and status (style cards, cast, scenes, line versions, bases, sheets, sheet lines).
 3. **Where to save**: `<project>/incoming/` with `00_style/ 01_cast/ 02_scenes/ 03_sheets/ 04_bases/`, exact
    filenames, "original PNG, not a screenshot", the full path for Codex if it saves the files.
@@ -48,8 +49,32 @@ Character blocks are copied word for word into every prompt. One sheet per age/l
 After the sheets exist, **rewrite the blocks to match what ChatGPT actually drew** (hats, hair, straps), so later
 prompts don't fight the sheets. Real photos (public domain) can be attached for clothes and build only.
 
-## Shot coverage (why ~150 images)
-A 12–15 min film needs a new picture every ~5–6 s. Give each big moment 3–7 shots, smaller ones 1–2:
+## The guide follows the narration (show, then draw)
+The way the film is narrated decides the shots (`references/storytelling.md`, section 6): each beat **shows** a
+moment for 3–5 s in a painted picture, then **draws** while the narrator explains. So the guide plans both, beat by
+beat, and every image row says which line of narration it serves and what will be drawn on or after it:
+
+```
+### Beat 5 · One bond, three loans  (BUT there were no real profits, SO he pledged one bond three times)
+| # | file | shot | shows (the narration line) | then drawn |
+| 61 | S05d_vault.png | M | "Ward had one bond." | the bond lifts off the shelf |
+| 62 | B02_bond.png (base) | – | "...borrowed against it, three times" | three banks, arrows, $ typed |
+| 63 | S05e_ward_face.png | F | "Nobody compared notes." | – |
+```
+
+Budget the images by the spine, not by the person's life:
+- **The rise, the turn and the fall get the coverage** (3–7 shots per big moment). Backstory gets 1–2 shots per
+  person, and only for the trait that drives the story. No sequences for childhood, schooling or other careers.
+- **Every explanation beat gets drawing material**, not more scenes: a sketch-sheet panel, a blank base, or a
+  scene with a `_lines` version. Plan **12 sketch sheets** (+ line versions), **~10 bases** and **6 scenes that
+  draw themselves**; about **100 scene shots** (≈150 images in all, as before, but more of them drawn).
+- **A time or place change gets one establishing W shot** carrying the place/date tag, instead of the narrator
+  saying the date.
+- **Seams:** for each planned act break (2–3 per film) plan a strong closing image and a strong opening image; other
+  batch boundaries need nothing special (the story continues across them).
+
+## Shot coverage
+A new picture **or a new drawing** every ~4–6 s. Give each big moment 3–7 shots, smaller ones 1–2:
 - **W** wide: where we are · **M** medium: people doing something · **F** face: EDIT pushed in, one expression ·
   **D** detail: hands or an object · **P** point of view: what someone sees.
 - Filenames: beat number + shot letter (`S03c_rifle.png`), so a moment's shots stay together.
@@ -61,13 +86,13 @@ EDIT: the same moment, with the camera pushed in close on [NAME]: head and shoul
 ```
 Write expressions as mouth line + head tilt + shoulders ("mouth a flat hard line, head lowered, shoulders squared").
 
-## Scenes that draw themselves (4 per film)
+## Scenes that draw themselves (6 per film)
 ```
 EDIT: the exact same picture as an illustrator's pen-and-ink drawing: remove all colour and painted shading, keep only black ink outlines and ink hatching on pure white paper. Same composition, nothing moved.
 ```
 Save as `<scene>_lines.png`. Pick big moments (arrival, the climax, the ending).
 
-## Sketch sheets (9 per film, 4 drawings each)
+## Sketch sheets (12 per film, 4 drawings each, one per explanation beat or two)
 ```
 A page from an illustrator's sketchbook: four separate drawings in confident pen-and-ink with fine hatching and a watercolour wash, on pure white paper, arranged left to right with clear white space between them (I will link them later). Neat, accurate drawings of real places and objects, not icons and not cartoons; the people are the egg-headed figures from the attached sheets, drawn in ink. No text, letters, numbers, arrows, frames, boxes, flags or insignia. Landscape.
 ```
@@ -77,7 +102,7 @@ EDIT: the exact same page and drawings, with all colour and all painted shading 
 ```
 Sheet drawings double as **lift sources**: the engine redraws any single drawing on a blank base.
 
-## Bases (blank story objects, ~7)
+## Bases (blank story objects, ~10)
 Real objects the story would have, **kept empty** (no map shapes, marks or writing): a field notebook of squared
 paper, an old military map sheet, a blackboard, a sheet of washi with ink stone and brush, a bamboo trunk, a
 newspaper page with an empty headline/photo box, an old globe turned to the region. Claude draws on them live.

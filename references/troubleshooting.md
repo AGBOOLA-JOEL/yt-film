@@ -13,6 +13,9 @@ Run `python scripts/doctor.py` first: it checks Python, libraries, FFmpeg, fonts
 | `KeyError: 'the phrase'` in a shots file | the cue isn't in Whisper's words: print them (`import_voice.py --words b3`) and cue on what it heard |
 | render stops: "readability problems" | read the list above it; fix placement/timing (or `--force` if you're sure) |
 | a render dies late / no error | memory: lower `YTF_JOBS`; test new effects on two frames (`stills.py bN 2 t1 t2`) first |
+| renders crawl, the PC lags, Disk 100% (Windows) / swap growing (Mac) | too many at once for the free memory: pause or stop the least-done renders, close apps, rerun `render_all.py --changed --jobs 2` (performance.md) |
+| characters look blurry | old `fx3.py`: update the engine (Focus now keeps people sharp); use `focus=` on a third of the scenes at most |
+| the film is hard to follow | write the spine and run the four story checks before recording (storytelling.md) |
 | typewriter labels look plain (Windows) | fonts weren't downloaded: re-run the setup script or see `fonts/README.md` |
 | footnote hand/note missing | the project can't find the repo: check `YTF_SKILL=` in the project's `.env` |
 | `429` / quota errors | Gemini rate limits: wait and run again (finished parts are cached) |

@@ -17,6 +17,7 @@ import cv2
 import numpy as np
 
 import film
+import look
 import ytf
 from film import SH, SW, UP, ease, up
 
@@ -680,8 +681,8 @@ class Inset:
         cx, cy = at
         self.pos = (int(cx * UP - w / 2), int(cy * UP - h / 2))
         self.t0, self.t1, self.t_out, self.glow = t0, t1, t_out, glow
-        self.col = np.array((34, 27, 22) if color == "ink" else (244, 238, 222), np.float32)
-        self.paper = np.array((246, 238, 220) if color == "ink" else (20, 16, 12), np.float32)
+        self.col = np.array(look.rgb("ink") if color == "ink" else look.rgb("light"), np.float32)
+        self.paper = np.array(look.rgb("light") if color == "ink" else look.dark(), np.float32)
 
     def __call__(self, a, t):
         if t < self.t0:

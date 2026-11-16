@@ -207,3 +207,4 @@ She never stole a dollar with a gun, or a lock pick. She used paper, and a name,
 ## P49 · The end card
 `[SHOTS: S12i_pavement (slow push, fade)]` `[then: cta]`
 If this story stayed with you, like the video, and follow the channel for more.
+(The example's recorded voice stops before this line: record your own end line with your channel's name.)

@@ -14,13 +14,14 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
 import film
+import look
 import ytf
 from film import FPS, OH, OW, PREVIEW, Paper, ROOT
 
 END = 7.0
 SR = 48000
 S = OW / 1920  # screen scale
-INK, RED, GREY = (34, 27, 22), (196, 32, 28), (96, 92, 88)
+INK, RED, GREY = look.rgb("ink"), look.rgb("accent"), (96, 92, 88)  # the look's ink and accent (YTF_LOOK)
 BOLD = ytf.font("bold")
 NAME = ytf.channel() if ytf.channel() != "the channel" else "Your Channel"  # YTF_CHANNEL in .env
 

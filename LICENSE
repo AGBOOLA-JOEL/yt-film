@@ -1,0 +1,37 @@
+yt-film Source-Available Licence, version 1.0
+Copyright (c) 2026 AGBOOLA-JOEL. All rights reserved except as granted below.
+
+This licence covers the code, documentation, guides and example material in this repository (the "Software").
+
+1. Use. You may download, install and run the Software, on as many computers as you like, to plan, illustrate,
+   narrate, render and publish your own videos, for personal or commercial purposes (including monetised channels).
+
+2. Your videos are yours. Videos, images, scripts, audio and other output you make with the Software belong to you.
+   No credit is required, though a link back is appreciated.
+
+3. Local changes. You may change your own installed copy (for example a project's tools/ folder, settings, looks,
+   shot lists and prompts) for your own use.
+
+4. What is not allowed without written permission from the copyright holder:
+   a. publishing, sharing or distributing the Software or a modified version of it, in whole or in substantial
+      part (including as a fork, mirror, package, template, course material or bundled product);
+   b. selling, sub-licensing or renting the Software, or offering it as a hosted or paid service;
+   c. removing or changing this licence or the copyright notice.
+   Forking on GitHub is permitted only as GitHub's terms require for viewing; forks may not be published as separate
+   projects or redistributed.
+
+5. Contributions. Issues, discussions, ideas and suggestions are welcome. By submitting a contribution (an issue,
+   comment, suggestion, code or file) you grant the copyright holder a perpetual, worldwide, royalty-free licence to
+   use, modify and include it in the Software under this or any other licence. Code changes are accepted only from
+   invited collaborators (see CONTRIBUTING.md).
+
+6. Third-party material keeps its own licence: fonts downloaded by the setup scripts (SIL Open Font Licence or Apache
+   2.0), Natural Earth data in engine/geo (public domain), archive photos in the examples (public domain, credited in
+   examples/chadwick/incoming/05_photos/CREDITS.md), and the libraries installed by the setup scripts.
+
+7. No warranty. The Software is provided "as is", without warranty of any kind. The copyright holder is not liable
+   for any claim, damage or other liability arising from its use. You are responsible for the rights to the images,
+   voices, music and facts you put into your videos, and for following the terms of the services you use (image
+   tools, text-to-speech, YouTube).
+
+8. Termination. This licence ends automatically if you break its terms; you must then stop using the Software.

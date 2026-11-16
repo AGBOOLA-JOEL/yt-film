@@ -32,9 +32,10 @@ WW, WH = 6600, 2700  # the page, in world px (1.5 world px per output px at the 
 PS = 1.5  # paper texture is stored at world / PS
 RNG = np.random.default_rng(7)
 
-INK, PENCIL, RED = (34, 27, 22), (88, 86, 90), (172, 46, 38)
+import look  # noqa: E402  (the film's look: ink, accent, handwriting font)
+INK, PENCIL, RED = look.rgb("ink"), (88, 86, 90), look.rgb("accent")
 import ytf  # noqa: E402
-HAND = ytf.font("hand")
+HAND = ytf.font(look.L.hand_font)
 
 # ---------------------------------------------------------------- paper
 
@@ -122,6 +123,7 @@ class Text:
         ImageDraw.Draw(m).text((10, 10), text, font=font, fill=255)
         m = m.rotate(angle, expand=True, resample=Image.BICUBIC)
         self.m, self.x, self.y = m, int(xy[0]), int(xy[1] - m.size[1] / 2)
+        self.angle = angle  # words should sit level unless they follow a line of the picture (flow.py checks)
         self.layer, self.t0, self.dur, self.tool, self.done = layer, t0, dur, tool, 0
         cols = np.asarray(m).max(0)
         self.cols = np.flatnonzero(cols > 0)
