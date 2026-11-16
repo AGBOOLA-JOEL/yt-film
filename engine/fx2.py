@@ -571,12 +571,12 @@ class Counter:
         self.keys, self.pos, self.label, self.prefix, self.size = keys, pos, label, prefix, size
         self.t_in = keys[0][0] - 0.4 if t_in is None else t_in
         self.t_out = t_out
-        self.font = ImageFont.truetype(ytf.font("mono_bold"), int(58 * size * OW / 1920))
-        self.lfont = ImageFont.truetype(ytf.font("mono"), int(30 * size * OW / 1920))
+        self.font = ImageFont.truetype(ytf.font("mono_bold"), int(58 * size * film.S))
+        self.lfont = ImageFont.truetype(ytf.font("mono"), int(30 * size * film.S))
         vmax = max(v for _, v in keys)
         self.nd = max(1, len(str(int(vmax))))
         self.cw = int(self.font.getlength("0"))
-        self.ch = int(66 * size * OW / 1920)
+        self.ch = int(66 * size * film.S)
         self.glyph = {}
         for d in "0123456789$,":
             im = Image.new("L", (self.cw + 4, self.ch), 0)
@@ -605,7 +605,7 @@ class Counter:
             if p and p % 3 == 0:
                 cells.append(("c", None))
         W_ = (len(cells) + 1) * self.cw - sum(self.cw // 2 for c_ in cells if c_[0] == 'c')
-        pw, ph = W_ + int(60 * OW / 1920), self.ch + int(56 * OW / 1920) + (int(34 * OW / 1920) if self.label else 0)
+        pw, ph = W_ + int(60 * film.S), self.ch + int(56 * film.S) + (int(34 * film.S) if self.label else 0)
         H, Wd = img.shape[:2]
         cx, cy = int(self.pos[0] * Wd), int(self.pos[1] * H)
         x0, y0 = cx - pw // 2, cy - ph // 2 + int((1 - k) * 30)
@@ -617,8 +617,8 @@ class Counter:
         out = _blend(out, x0 - 14, y0 - 12, np.zeros((ph + 40, pw + 40, 3), np.float32), sh)
         out = _blend(out, x0 - 20, y0 - 20, np.ones((ph + 40, pw + 40, 3), np.float32) * np.array(look.rgb("paper"), np.float32), tag * k * 0.97)
         ink = np.array(look.on_paper(), np.float32)
-        x = x0 + int(30 * OW / 1920)
-        y = y0 + int(22 * OW / 1920)
+        x = x0 + int(30 * film.S)
+        y = y0 + int(22 * film.S)
         g = self.glyph["$"]
         out = _blend(out, x, y, np.broadcast_to(ink, g.shape + (3,)), g * k)
         x += self.cw
@@ -646,10 +646,10 @@ class Counter:
                 out = _blend(out, x, y + max(0, dy), np.broadcast_to(ink, gg.shape + (3,)), gg * k * (0.25 if lead else 1))
             x += self.cw
         if self.label:
-            im = Image.new("L", (pw, int(40 * OW / 1920)), 0)
-            ImageDraw.Draw(im).text((int(30 * OW / 1920), 0), self.label, font=self.lfont, fill=255)
+            im = Image.new("L", (pw, int(40 * film.S)), 0)
+            ImageDraw.Draw(im).text((int(30 * film.S), 0), self.label, font=self.lfont, fill=255)
             g = np.asarray(im, np.float32) / 255
-            out = _blend(out, x0, y0 + self.ch + int(30 * OW / 1920), np.broadcast_to(ink, g.shape + (3,)), g * k * 0.9)
+            out = _blend(out, x0, y0 + self.ch + int(30 * film.S), np.broadcast_to(ink, g.shape + (3,)), g * k * 0.9)
         return out
 
 
@@ -685,13 +685,13 @@ def _shards(seed=9, n=46, centre=(0.5, 0.45)):
         d = np.array(cc) - c
         dist = np.linalg.norm(d) / OW
         shards.append(dict(box=(x0, y0, x1, y1), m=(m[y0:y1, x0:x1] > 0).astype(np.float32), c=np.array(cc, np.float32),
-                           v=d / (np.linalg.norm(d) + 1e-6) * r.uniform(80, 260) * OW / 1920, spin=r.uniform(-90, 90),
+                           v=d / (np.linalg.norm(d) + 1e-6) * r.uniform(80, 260) * film.S, spin=r.uniform(-90, 90),
                            delay=dist * 0.35 + r.uniform(0, 0.08), poly=poly))
     # crack lines: the facet edges, drawn outward from the impact
     cracks = np.zeros((OH, OW), np.float32)
     dmap = np.full((OH, OW), 9.0, np.float32)
     for s in shards:
-        cv2.polylines(cracks, [s["poly"]], True, 1.0, max(1, int(2 * OW / 1920)), cv2.LINE_AA)
+        cv2.polylines(cracks, [s["poly"]], True, 1.0, max(1, int(2 * film.S)), cv2.LINE_AA)
     yy, xx = np.mgrid[0:OH, 0:OW].astype(np.float32)
     dmap = np.hypot(xx - c[0], yy - c[1]) / (OW * 0.8)
     _SH[key] = (shards, cracks, dmap, c)
@@ -719,7 +719,7 @@ def shatter(a, b, u, tr):
             out[y0:y1, x0:x1] = out[y0:y1, x0:x1] * (1 - m) + reg * m
             continue
         dx, dy = s["v"] * tt * 2.2
-        dy += 2200 * OW / 1920 * tt * tt
+        dy += 2200 * film.S * tt * tt
         ang = s["spin"] * tt
         sc = 1 + 0.25 * tt
         cx, cy = s["c"]

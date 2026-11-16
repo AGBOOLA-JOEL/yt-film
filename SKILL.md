@@ -11,6 +11,11 @@ description: >-
 
 For vertical Reels, Shorts, or serialized social videos, use the companion [yt-film-reels skill](skills/yt-film-reels/SKILL.md).
 
+**The base set is a floor, not the film.** For every film, landscape or portrait, do the creative pass in
+[Claude is the driver](references/creative.md) before the shot lists: decide what this story needs that the base does
+not have (its own effects, transitions, sounds, drawing devices), make or look those up, and reuse a base effect only
+where it fits. The engine renders portrait too: [portrait mode](references/portrait.md).
+
 A production line for story films: the user makes ~150 still images from a guide Claude writes, Claude writes the
 script from those images, a voice reads it, and the **Python engine** brings every picture to life in time with the
 words. The reference film is the **Chadwick example** (`examples/chadwick/`, *Carnegie's Daughter*: the woman who

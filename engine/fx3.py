@@ -27,7 +27,7 @@ from film import UP, SW, SH, ease, up
 from fx2 import _blend, _sm
 
 ROOT = film.ROOT
-K = film.OH / 1080  # screen-space sizes are written for 1080p
+K = film.S  # screen-space sizes are written for 1080p
 
 
 def has_depth(img):
