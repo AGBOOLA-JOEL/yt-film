@@ -1,19 +1,15 @@
 ---
 name: yt-film
 description: >-
-  Make a narrated YouTube documentary/explainer film end to end with a Python film engine, from a title to the
-  finished MP4: story research and a verified fact list, an image guide for whatever image tool the user has
-  (ChatGPT, Codex, Google Flow/Whisk, the Gemini API, Midjourney and others) with style and character consistency,
-  a narrator script written from the images, the voice (Gemini TTS, or the user's own recording/TTS imported and
-  timed with Whisper), a score (Lyria or the user's music), living stills (camera moves, smoke, breath, flames,
-  light, weather, lifted objects, tears, shatters), drawings made live, typewriter labels, acting faces, comic pages,
-  a living map, footnote cards, synthesised sound, parallel batch renders sized to the machine, an ending, a −14 LUFS
-  final join, dubbed audio tracks and thumbnails. Works on macOS and Windows. Use whenever the user wants a new
-  video, story ideas, an image guide, a script, voice, music, shots, renders, the final film, dubs, thumbnails, or
-  help installing or setting up yt-film, or mentions the Chadwick example.
+  Make a long-form narrated YouTube documentary or explainer with the yt-film Python engine. Use for story
+  ideas, source research, image guides, scripts, timed narration, music, living stills, maps, comic pages,
+  source footnotes, sound, landscape batch renders, final mixes, dubs, thumbnails, setup, or the Chadwick
+  example. The companion yt-film-reels skill covers vertical social episodes.
 ---
 
 # yt-film: narrated films from still images
+
+For vertical Reels, Shorts, or serialized social videos, use the companion [yt-film-reels skill](skills/yt-film-reels/SKILL.md).
 
 A production line for story films: the user makes ~150 still images from a guide Claude writes, Claude writes the
 script from those images, a voice reads it, and the **Python engine** brings every picture to life in time with the
